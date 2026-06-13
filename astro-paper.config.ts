@@ -2,14 +2,14 @@ import { defineAstroPaperConfig } from "./src/types/config";
 
 export default defineAstroPaperConfig({
   site: {
-    url: "https://astro-paper.pages.dev/",
-    title: "AstroPaper",
-    description: "A minimal, responsive and SEO-friendly Astro blog theme.",
+    url: "https://qihanx.cn/",
+    title: "启涵的小破站",
+    description: "最慢的步伐不是跬步，而是徘徊；最快的脚步不是冲刺，而是坚持。",
     author: "Sat Naing",
     profile: "https://satna.ing",
     ogImage: "default-og.jpg",
     lang: "en",
-    timezone: "Asia/Bangkok",
+    timezone: "Asia/Shanghai",
     dir: "ltr",
   },
   posts: {
@@ -29,10 +29,9 @@ export default defineAstroPaperConfig({
     search: "pagefind",
   },
   socials: [
-    { name: "github",   url: "https://github.com/satnaing/astro-paper" },
-    { name: "x",        url: "https://x.com/username" },
-    { name: "linkedin", url: "https://www.linkedin.com/in/username/" },
-    { name: "mail",     url: "mailto:yourmail@gmail.com" },
+    { name: "github",   url: "https://github.com/ChenQihan666/" },
+    { name: "x",        url: "https://x.com/QihanNX" },
+    { name: "mail",     url: "mailto:nuo66688@163.com" },
   ],
   shareLinks: [
     { name: "whatsapp", url: "https://wa.me/?text=" },
