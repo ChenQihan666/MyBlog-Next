@@ -1,6 +1,6 @@
 ---
 title: "关于"
-description: "关于我自己."
+description: "关于我自己"
 ---
 
 # 你好，我是启涵 👋
