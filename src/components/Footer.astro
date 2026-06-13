@@ -2,52 +2,20 @@
 const currentYear = new Date().getFullYear();
 ---
 
-<footer class="site-footer">
-  <div class="footer-content">
-    <p class="copyright">
-      &copy; {currentYear} 启涵的小破站
-    </p>
-    <p class="icp">
-      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
+<footer class="app-layout mt-auto">
+  <div class="border-border flex flex-col items-center justify-between border-t py-6 sm:flex-row sm:py-4">
+    <div class="my-2">
+      <span>&copy; {currentYear} 启涵的小破站</span>
+    </div>
+    <div class="my-2">
+      <a
+        href="https://beian.miit.gov.cn/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:underline"
+      >
         陇ICP备2026002087号-2
       </a>
-    </p>
+    </div>
   </div>
 </footer>
-
-<style>
-  .site-footer {
-    margin-top: auto;
-    padding: 1.5rem 1rem;
-    background-color: var(--color-bg-footer, #f9fafb);
-    border-top: 1px solid var(--color-border, #e5e7eb);
-  }
-
-  .footer-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .copyright,
-  .icp {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--color-text-secondary, #6b7280);
-  }
-
-  .icp a {
-    color: var(--color-text-secondary, #6b7280);
-    text-decoration: none;
-    transition: color 0.2s ease;
-  }
-
-  .icp a:hover {
-    color: var(--color-text-primary, #111827);
-    text-decoration: underline;
-  }
-</style>
