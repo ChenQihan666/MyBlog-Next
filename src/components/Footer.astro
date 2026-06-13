@@ -1,30 +1,69 @@
 ---
-import type { HTMLAttributes } from "astro/types";
-import Socials from "./Socials.astro";
-import { useTranslations } from "@/i18n";
-
-type Props = {
-  noMarginTop?: boolean;
-} & HTMLAttributes<"footer">;
-
-const { noMarginTop = false, class: className, ...attrs } = Astro.props;
-
-const t = useTranslations(Astro.currentLocale);
+// --- 1. 组件脚本 (Frontmatter) ---
+// 在这里编写JavaScript逻辑，这部分代码只在构建时运行，不会发送到浏览器
+import { YOUR_ICP_NUMBER } from '../config'; // 假设你将备案号存在了配置文件中
 const currentYear = new Date().getFullYear();
+// 你也可以直接从组件属性(props)获取数据，这里为了简洁，先写为固定值
+// 更多关于在组件脚本中编写JS的内容：https://www.astrojs.cn/zh-cn/basics/astro-components/[reference:2]
 ---
 
-<footer
-  class:list={["app-layout", { "mt-auto": !noMarginTop }, className]}
-  {...attrs}
->
-  <div
-    class="border-border flex flex-col items-center justify-between border-t py-6 sm:flex-row-reverse sm:py-4"
-  >
-    <Socials />
-    <div class="my-2 flex flex-col items-center whitespace-nowrap sm:flex-row">
-      <span>{t.footer.copyright} &#169; {currentYear}</span>
-      <span class="hidden sm:inline">&nbsp;|&nbsp;</span>
-      <span>{t.footer.allRightsReserved}</span>
-    </div>
+<!--
+  --- 2. 组件模板 (HTML) ---
+  这里是生成最终HTML的部分，支持JSX风格的表达式。
+  更多语法细节：https://docs.astro.build/zh-cn/reference/astro-syntax/[reference:3]
+-->
+
+<footer class="site-footer">
+  <div class="footer-content">
+    <p class="copyright">
+      &copy; {currentYear} 启涵的小破站
+    </p>
+    <p class="icp">
+      <!--
+        需要带上 `rel="noopener noreferrer"` 来提升安全性。
+        链接必须指向工信部官网首页，以符合规定。https://beian.miit.gov.cn/[reference:4]
+      -->
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
+        陇ICP备2026002087号-2
+      </a>
+    </p>
   </div>
 </footer>
+
+<!--
+  --- 3. 组件样式 (CSS) ---
+  <style>标签内的样式默认只作用于当前组件，不会影响页面其他地方。
+  更多关于在组件中编写样式的内容：https://www.astrojs.cn/zh-cn/guides/styling/
+-->
+<style>
+  .site-footer {
+    margin-top: auto; /* 将页脚推到底部 */
+    padding: 1.5rem 1rem;
+    text-align: center;
+    background-color: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .copyright,
+  .icp {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .icp a {
+    color: #6b7280;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .icp a:hover {
+    color: #111827;
+    text-decoration: underline;
+  }
+</style>
