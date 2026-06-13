@@ -25,13 +25,13 @@ export default {
   pagination: {
     prev: "上一页",
     next: "下一页",
-    page: "第",
+    page: "页码：",
   },
   home: {
     socialLinks: "社交链接",
     featured: "精选",
-    recentPosts: "最新文章",
-    allPosts: "所有文章",
+    recentPosts: "最新水文",
+    allPosts: "所有水文",
   },
   footer: {
     copyright: "版权",
