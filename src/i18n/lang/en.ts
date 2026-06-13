@@ -25,7 +25,7 @@ export default {
   pagination: {
     prev: "上一页",
     next: "下一页",
-    page: "页码：",
+    page: "页码:",
   },
   home: {
     socialLinks: "社交链接",
