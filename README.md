@@ -1,2 +1,2 @@
-## 💻 本博客由QihanNX使用Astro构建
-#声明：由主题Paper魔改而来
+## 本博客由QihanNX使用Astro构建
+# 声明：此博客由Astro-Paper修改
