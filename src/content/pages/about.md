@@ -1,37 +1,39 @@
 ---
-title: "About"
-description: "A bit about me and this blog."
+title: "关于"
+description: "关于我自己."
 ---
 
-AstroPaper is a minimal, accessible and SEO-friendly blog theme built with [Astro](https://astro.build/) and [Tailwind CSS](https://tailwindcss.com/).
+# 你好，我是启涵 👋
 
-![Astro Paper](@/assets/images/astropaper-og.jpg)
+欢迎来到我的技术小站！
 
-AstroPaper provides a solid foundation for blogs, or even portfolios\_ with full markdown support, built-in dark mode, and a clean layout that works out-of-the-box.
+我是启涵，一名初二学生，现居古都西安。虽然我的年龄不大，但对技术的热爱可一点都不“初級”——尤其是对编程和前端开发，总能让我乐在其中。
 
-The blog posts in this theme also serve as guides, docs or example articles\_ making AstroPaper a flexible starting point for your next content-driven site.
+## 为什么我会开始写博客？
 
-## Features
+可能和你想的不一样，不是因为作业太多想逃避（虽然作业确实不少🤣），而是因为我发现，**分享是最好的学习方式**。
 
-AstroPaper comes with a set of useful features that make content publishing easy and effective:
+从第一次用 HTML 写出“Hello World”，到用 CSS 折腾出花花绿绿的页面，再到现在用 **Astro** 搭建出这个博客——每一步都让我兴奋不已。而写博客，就是想把这份兴奋、踩过的坑、学会的小技巧，记录下来，分享给同样对技术感兴趣的你。
 
-- SEO-friendly
-- Fast performance
-- Light & dark mode
-- Highly customizable
-- Organizable blog posts
-- Responsive & accessible
-- Static search with [PageFind](https://pagefind.app/)
-- Automatic social image generation
+## 关于 Astro 和这个博客
 
-and so much more.
+你可能好奇：为什么选择 Astro？
 
-## Show your support
+简单说：**快，而且灵活**。
 
-If you like [AstroPaper](https://github.com/satnaing/astro-paper), consider giving it a star ⭐️.
+Astro 能让我在写博客时，像写普通 HTML 一样简单，同时又可以混用 React、Vue 等组件（虽然我还在学习中😅）。它默认几乎不输出任何 JavaScript，页面加载飞快，特别适合博客这种内容型网站。
 
-Found a bug 🐛 or have an improvement ✨ in mind? Feel free to open an [issue](https://github.com/satnaing/astro-paper/issues), submit a [pull request](https://github.com/satnaing/astro-paper/pulls) or start a [discussion](https://github.com/satnaing/astro-paper/discussions).
+这个博客，就是我用 Astro 从零搭建的。未来我会在这里分享：
 
-If you find this theme helpful, you can also [sponsor me on GitHub](https://github.com/sponsors/satnaing) or [buy me a coffee](https://buymeacoffee.com/satnaing) to show your support — every penny counts.
+- 我的前端学习笔记（HTML/CSS/JS/框架）
+- 解决 bug 的有趣经历
+- 适合初中生的编程资源和工具
+- 偶尔也聊聊西安的生活与学习日常
 
-Kyay zuu! 🙏🏼
+## 一起成长吧！
+
+我不是大神，也不是老师，只是一个和你一样在屏幕前认真写代码、认真生活的普通学生。如果我的某篇文章能帮你解决一个小问题，或者让你也对编程产生兴趣，那就是我最开心的事。
+
+欢迎常来逛逛，也可以给我留言（虽然可能要等我写完作业才能回复🙈）。
+
+**保持好奇，持续敲码。**
