@@ -5,34 +5,110 @@
 <div class="giscus"></div>
 
 <script>
+  let giscusIframe = null;
+
+  // 获取当前博客的主题 ('dark' 或 'light')
+  function getCurrentTheme() {
+    // astro-paper 主题通常会在 <html> 上添加 class="dark" 或 data-theme="dark"
+    const html = document.documentElement;
+    const isDark =
+      html.classList.contains('dark') ||
+      html.getAttribute('data-theme') === 'dark' ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches &&
+        !html.classList.contains('light') &&
+        html.getAttribute('data-theme') !== 'light');
+    return isDark ? 'dark' : 'light';
+  }
+
+  // 向 giscus iframe 发送主题变更消息
+  function setGiscusTheme(theme) {
+    if (giscusIframe && giscusIframe.contentWindow) {
+      giscusIframe.contentWindow.postMessage(
+        { giscus: { setConfig: { theme } } },
+        'https://giscus.app'
+      );
+    }
+  }
+
+  // 当主题改变时调用
+  function onThemeChange() {
+    const newTheme = getCurrentTheme();
+    setGiscusTheme(newTheme);
+  }
+
+  // 加载 Giscus 评论
   function loadGiscus() {
+    const container = document.querySelector('.giscus');
+    if (!container) return;
+    container.innerHTML = ''; // 清空已有内容，避免重复加载
+
     const script = document.createElement('script');
     script.src = 'https://giscus.app/client.js';
-    script.setAttribute('data-repo', 'ChenQihan666/MyBlog-Next'); // 改成你的仓库
-    script.setAttribute('data-repo-id', 'R_kgDOS5hWlA'); // 改成你的repo-id
+    script.setAttribute('data-repo', 'ChenQihan666/MyBlog-Next');
+    script.setAttribute('data-repo-id', 'R_kgDOS5hWlA');
     script.setAttribute('data-category', 'Comments');
-    script.setAttribute('data-category-id', 'DIC_kwDOS5hWlM4C_IEh'); // 改成你的category-id
+    script.setAttribute('data-category-id', 'DIC_kwDOS5hWlM4C_IEh');
     script.setAttribute('data-mapping', 'pathname');
     script.setAttribute('data-reactions-enabled', '1');
     script.setAttribute('data-emit-metadata', '0');
     script.setAttribute('data-input-position', 'bottom');
-    script.setAttribute('data-theme', 'preferred_color_scheme');
+    // 初始主题：根据当前主题动态设置
+    script.setAttribute('data-theme', getCurrentTheme());
     script.setAttribute('data-lang', 'zh-CN');
     script.setAttribute('crossorigin', 'anonymous');
     script.async = true;
 
-    const container = document.querySelector('.giscus');
-    if (container) {
-      container.innerHTML = ''; // 清空容器，避免重复加载
-      container.appendChild(script);
-    }
+    // 脚本加载完成后，找到 giscus 生成的 iframe 并保存引用
+    script.onload = () => {
+      const findIframe = () => {
+        const iframe = document.querySelector('.giscus iframe');
+        if (iframe) {
+          giscusIframe = iframe;
+          // 确保 iframe 完全加载后再发送主题（防止过早）
+          giscusIframe.addEventListener('load', () => onThemeChange());
+          onThemeChange(); // 立即再同步一次
+        } else {
+          setTimeout(findIframe, 100);
+        }
+      };
+      findIframe();
+    };
+
+    container.appendChild(script);
   }
 
-  // 页面首次加载时初始化
-  loadGiscus();
+  // 监听主题切换：观察 <html> 上 class 或 data-theme 属性的变化
+  let observer = null;
+  function startObservingTheme() {
+    const target = document.documentElement;
+    observer = new MutationObserver(() => onThemeChange());
+    observer.observe(target, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+  }
 
-  // 【关键】监听Astro的视图过渡事件，页面切换时重新加载评论
-  document.addEventListener('astro:page-load', loadGiscus);
+  // 初始化：加载评论 + 启动主题监听
+  loadGiscus();
+  startObservingTheme();
+
+  // 监听系统主题偏好变化（如果用户没有手动设置过主题，则跟随系统）
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    const html = document.documentElement;
+    const hasManualTheme = html.classList.contains('dark') ||
+                           html.classList.contains('light') ||
+                           html.getAttribute('data-theme') === 'dark' ||
+                           html.getAttribute('data-theme') === 'light';
+    if (!hasManualTheme) {
+      onThemeChange();
+    }
+  });
+
+  // 处理 Astro 的视图过渡（SPA 导航）：每次页面切换后重新加载评论并重新监听
+  document.addEventListener('astro:page-load', () => {
+    loadGiscus();
+    if (observer) {
+      observer.disconnect();
+      startObservingTheme();
+    }
+  });
 </script>
 
 <style>
