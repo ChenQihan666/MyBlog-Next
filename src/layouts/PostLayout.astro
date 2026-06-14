@@ -1,7 +1,6 @@
 ---
 import Layout from "./Layout.astro";
 import config from "@/config";
-import Giscus from "@/components/Giscus.astro";
 
 type Props = {
   title?: string;
@@ -36,6 +35,7 @@ const structuredData = {
 
 <Layout {title} {description} {ogImage} {canonicalURL}>
   <Fragment slot="head">
+    <!-- Override og:type for article pages -->
     <meta property="og:type" content="article" />
 
     {
@@ -63,5 +63,4 @@ const structuredData = {
   </Fragment>
 
   <slot />
-  <Giscus />
 </Layout>
