@@ -24,7 +24,7 @@ export default defineAstroPaperConfig({
     showBackButton: true,
     editPost: {
       enabled: false,
-      url: "https://github.com/ChenQihan666/Qihan-Blog/",
+      url: "",
     },
     search: "pagefind",
   },
