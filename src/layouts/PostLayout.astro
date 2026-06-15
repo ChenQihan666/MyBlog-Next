@@ -16,7 +16,7 @@ const { site } = config;
 
 const { title, description, ogImage, canonicalURL, pubDatetime, modDatetime } = Astro.props;
 
-const commentPath = canonicalURL ? new URL(canonicalURL).pathname : undefined;
+const commentPath = Astro.url.pathname;
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -54,7 +54,7 @@ const structuredData = {
   <slot />
 
   {
-    commentPath && (
+    commentPath.startsWith("/posts/") && (
       <TwikooComments envId="http://47.108.235.131:40063/" path={commentPath} />
     )
   }
