@@ -11,8 +11,7 @@ const { envId, path } = Astro.props;
   <div id="tcomment" data-env-id={envId} data-path={path || 'auto'}></div>
 </div>
 
-<!-- 最新版 Twikoo 前端，is:inline 防止 Astro 处理 -->
-<script is:inline src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js" defer></script>
+<script is:inline src="https://unpkg.zhimg.com/twikoo@1/dist/twikoo.all.min.js" defer></script>
 
 <script is:inline>
   var initDone = false;
@@ -24,33 +23,24 @@ const { envId, path } = Astro.props;
     var envId = container.dataset.envId;
     var path = container.dataset.path || location.pathname;
 
-    if (typeof window.twikoo === 'undefined') {
-      setTimeout(function () {
-        if (typeof window.twikoo !== 'undefined') {
-          doInit(container, envId, path);
-        } else {
-          container.innerHTML =
-            '<p class="text-red-500">评论系统加载失败，请刷新重试</p>';
-        }
-      }, 800);
-      return;
+    function tryInit(retry) {
+      if (typeof window.twikoo !== 'undefined') {
+        window.twikoo.init({
+          envId: envId,
+          el: '#tcomment',
+          path: path,
+          lang: 'zh-CN',
+        });
+        return;
+      }
+      if (retry < 30) {
+        setTimeout(function () { tryInit(retry + 1); }, 300);
+      } else {
+        container.innerHTML = '<p class="text-gray-500">评论正在赶来…</p>';
+      }
     }
 
-    doInit(container, envId, path);
-  }
-
-  function doInit(container, envId, path) {
-    try {
-      window.twikoo.init({
-        envId: envId,
-        el: '#tcomment',
-        path: path,
-        lang: 'zh-CN',
-      });
-    } catch (e) {
-      console.error('Twikoo init error:', e);
-      container.innerHTML = '<p class="text-red-500">评论初始化失败</p>';
-    }
+    tryInit(0);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -75,18 +65,29 @@ const { envId, path } = Astro.props;
 </script>
 
 <style is:global>
+  /* 1. 评论区容器：防止加载时内容溢出 */
   #tcomment {
     min-height: 200px;
+    overflow: hidden;          /* 加载时隐藏溢出（表情、字体等） */
   }
 
+  /* 2. 强制 Footer 回到正常文档流，不让它覆盖评论区 */
+  footer {
+    position: static !important;  /* 移除 sticky/fixed */
+    margin-top: 2rem !important;
+  }
+
+  /* 3. 如果 Paper 用了 footer 的 class 而非标签，同样处理 */
+  .footer,
+  [class*="footer"] {
+    position: static !important;
+  }
+
+  /* 暗色模式适配（仅保留必要的输入背景修复） */
   .dark #tcomment .tk-content textarea,
   .dark #tcomment .tk-input input {
     background-color: rgb(39 39 42) !important;
     border-color: rgb(63 63 70) !important;
     color: rgb(228 228 231) !important;
-  }
-
-  #tcomment .tk-submit {
-    max-width: 120px;
   }
 </style>
