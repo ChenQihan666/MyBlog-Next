@@ -8,29 +8,29 @@ const { envId, path } = Astro.props;
 ---
 
 <div class="twikoo-wrapper mx-auto max-w-2xl">
-  <div 
-    id="tcomment" 
-    data-env-id={envId}
-    data-path={path || 'auto'}
-  ></div>
+  <div id="tcomment" data-env-id={envId} data-path={path || 'auto'}></div>
 </div>
 
-<script>
-  let initDone = false;
+<!-- 最新版 Twikoo 前端，is:inline 防止 Astro 处理 -->
+<script is:inline src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js" defer></script>
+
+<script is:inline>
+  var initDone = false;
 
   function initTwikoo() {
-    const container = document.getElementById('tcomment');
+    var container = document.getElementById('tcomment');
     if (!container) return;
 
-    const envId = container.dataset.envId;
-    const path = container.dataset.path || location.pathname;
+    var envId = container.dataset.envId;
+    var path = container.dataset.path || location.pathname;
 
     if (typeof window.twikoo === 'undefined') {
-      setTimeout(() => {
+      setTimeout(function () {
         if (typeof window.twikoo !== 'undefined') {
           doInit(container, envId, path);
         } else {
-          container.innerHTML = `<p class="text-red-500">评论系统加载失败，请刷新重试</p>`;
+          container.innerHTML =
+            '<p class="text-red-500">评论系统加载失败，请刷新重试</p>';
         }
       }, 800);
       return;
@@ -42,28 +42,31 @@ const { envId, path } = Astro.props;
   function doInit(container, envId, path) {
     try {
       window.twikoo.init({
-        envId,
+        envId: envId,
         el: '#tcomment',
-        path,
+        path: path,
         lang: 'zh-CN',
       });
     } catch (e) {
       console.error('Twikoo init error:', e);
-      container.innerHTML = `<p class="text-red-500">评论初始化失败</p>`;
+      container.innerHTML = '<p class="text-red-500">评论初始化失败</p>';
     }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', function () {
     initTwikoo();
     initDone = true;
   });
 
-  document.addEventListener('astro:after-swap', () => {
+  document.addEventListener('astro:after-swap', function () {
     initDone = false;
     initTwikoo();
   });
 
-  if (document.readyState === 'interactive' || document.readyState === 'complete') {
+  if (
+    document.readyState === 'interactive' ||
+    document.readyState === 'complete'
+  ) {
     if (!initDone) {
       initTwikoo();
       initDone = true;
@@ -71,18 +74,11 @@ const { envId, path } = Astro.props;
   }
 </script>
 
-<!-- 使用最新版 Twikoo 前端（版本号 @1 自动匹配最新稳定版） -->
-<script 
-  src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js"
-  defer
-></script>
-
 <style is:global>
   #tcomment {
     min-height: 200px;
   }
 
-  /* 暗色模式适配（仅修复输入背景，不影响原有 Paper 风格） */
   .dark #tcomment .tk-content textarea,
   .dark #tcomment .tk-input input {
     background-color: rgb(39 39 42) !important;
