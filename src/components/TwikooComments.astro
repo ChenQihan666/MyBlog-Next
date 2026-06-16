@@ -3,7 +3,6 @@ interface Props {
   envId: string;
   path?: string;
 }
-
 const { envId, path } = Astro.props;
 ---
 
@@ -14,76 +13,80 @@ const { envId, path } = Astro.props;
 <script is:inline src="/twikoo.all.min.js" defer></script>
 
 <script is:inline>
-  var initDone = false;
+  let initPromise = null;
 
-  function initTwikoo() {
-    var container = document.getElementById('tcomment');
+  async function initTwikoo() {
+    const container = document.getElementById('tcomment');
     if (!container) return;
 
-    var envId = container.dataset.envId;
-    var path = container.dataset.path || location.pathname;
+    // 避免重复初始化（如果正在初始化则等待）
+    if (initPromise) return initPromise;
 
-    function tryInit(retry) {
-      if (typeof window.twikoo !== 'undefined') {
-        window.twikoo.init({
-          envId: envId,
-          el: '#tcomment',
-          path: path,
-          lang: 'zh-CN',
-        });
+    initPromise = (async () => {
+      const envId = container.dataset.envId;
+      let path = container.dataset.path;
+      if (path === 'auto' || !path) {
+        path = window.location.pathname;
+      }
+
+      // 等待 twikoo 脚本加载完成
+      let retries = 0;
+      while (typeof window.twikoo === 'undefined' && retries < 30) {
+        await new Promise(r => setTimeout(r, 200));
+        retries++;
+      }
+
+      if (typeof window.twikoo === 'undefined') {
+        container.innerHTML = '<p class="text-gray-500">评论系统加载失败，请刷新重试。</p>';
         return;
       }
-      if (retry < 30) {
-        setTimeout(function () { tryInit(retry + 1); }, 300);
-      } else {
-        container.innerHTML = '<p class="text-gray-500">评论正在赶来…</p>';
-      }
-    }
 
-    tryInit(0);
+      // 清空容器，避免残留旧内容导致样式错乱
+      container.innerHTML = '';
+
+      // 调用 Twikoo 初始化
+      window.twikoo.init({
+        envId: envId,
+        el: '#tcomment',
+        path: path,
+        lang: 'zh-CN',
+      });
+    })();
+
+    return initPromise;
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  // 初始加载
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initTwikoo());
+  } else {
     initTwikoo();
-    initDone = true;
-  });
-
-  document.addEventListener('astro:after-swap', function () {
-    initDone = false;
-    initTwikoo();
-  });
-
-  if (
-    document.readyState === 'interactive' ||
-    document.readyState === 'complete'
-  ) {
-    if (!initDone) {
-      initTwikoo();
-      initDone = true;
-    }
   }
+
+  // 处理 Astro 视图转换（页面切换）
+  document.addEventListener('astro:after-swap', () => {
+    // 重置初始化标记，重新执行
+    initPromise = null;
+    // 给新 DOM 一点时间渲染
+    setTimeout(() => initTwikoo(), 50);
+  });
 </script>
 
 <style is:global>
-  /* 1. 评论区容器：防止加载时内容溢出 */
+  /* 确保评论区容器有最小高度，避免加载时塌陷 */
   #tcomment {
     min-height: 200px;
-    overflow: hidden;          /* 加载时隐藏溢出（表情、字体等） */
   }
 
-  /* 2. 强制 Footer 回到正常文档流，不让它覆盖评论区 */
-  footer {
-    position: static !important;  /* 移除 sticky/fixed */
-    margin-top: 2rem !important;
-  }
-
-  /* 3. 如果 Paper 用了 footer 的 class 而非标签，同样处理 */
+  /* 强制页脚回到正常流（辅助解决位置问题，但主要靠插槽解决） */
+  footer,
   .footer,
   [class*="footer"] {
     position: static !important;
+    margin-top: 2rem !important;
   }
 
-  /* 暗色模式适配（仅保留必要的输入背景修复） */
+  /* 暗色模式适配 */
   .dark #tcomment .tk-content textarea,
   .dark #tcomment .tk-input input {
     background-color: rgb(39 39 42) !important;
