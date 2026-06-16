@@ -9,25 +9,18 @@
 <script is:inline>
   function initTwikoo() {
     if (window.tw) {
-      const el = document.getElementById('Comments');
-      if (el) el.innerHTML = '';
+      if (document.getElementById("Comments")) {
+        document.getElementById("Comments").innerHTML = "";
+      }
       window.tw = null;
     }
-
-    const el = document.getElementById('Comments');
-    if (!el) return;
-
-    try {
-      window.tw = twikoo.init({
-        el: '#Comments',
-        envId: 'http://47.108.235.131:40063/',
-        lang: 'zh-CN',
-      });
-    } catch (e) {
-      console.error('Twikoo 初始化失败：', e);
-    }
+    var tw = twikoo.init({
+      el: "#Comments",
+      envId: "http://47.108.235.131:40063/",
+      lang: "zh-CN",
+    });
+    window.tw = tw;
   }
-
-  window.addEventListener('load', initTwikoo);
-  document.addEventListener('astro:page-load', initTwikoo);
+  window.addEventListener("load", initTwikoo);
+  document.addEventListener("astro:page-load", initTwikoo);
 </script>
