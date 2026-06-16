@@ -1,38 +1,26 @@
----
-// src/components/Twikoo.astro
----
-
-<div id="twikoo"></div>
+<div id="tcomment"></div>
 
 <script>
-  function loadTwikoo() {
-    // 动态导入Twikoo，避免SSR问题
-    import('twikoo').then((twikoo) => {
-      twikoo.init({
-        envId: 'http://47.108.235.131:40063/', // 改成你的Worker域名
-        el: '#twikoo',
-        path: window.location.pathname,
-        lang: 'zh-CN',
-      });
-    });
-  }
-
-  // 页面首次加载
-  loadTwikoo();
-
-  // 【关键】视图过渡路由兼容
   document.addEventListener('astro:page-load', () => {
-    // 清空容器，避免重复渲染
-    const container = document.getElementById('twikoo');
-    if (container) {
-      container.innerHTML = '';
-      loadTwikoo();
+    function loadTwikoo() {
+      const commentsContainer = document.getElementById('tcomment');
+      if (commentsContainer) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.staticfile.org/twikoo/1.6.32/twikoo.all.min.js';
+        script.async = true;
+        script.onload = () => {
+          const initScript = document.createElement('script');
+          initScript.innerHTML = `
+            twikoo.init({
+                envId: 'http://47.108.235.131:40063/',
+                el: '#tcomment',
+            });
+        `;
+          document.body.appendChild(initScript);
+        };
+        document.body.appendChild(script);
+      }
     }
+    loadTwikoo();
   });
 </script>
-
-<style>
-  #twikoo {
-    margin-top: 2rem;
-  }
-</style>
