@@ -2,25 +2,41 @@
 // src/components/Comment.astro
 ---
 
-<div id="tcomment"></div>
+<div id="tcomment" class="twikoo-wrap"></div>
 
+<!-- 使用本地 JS 文件（放在 public/js/twikoo.all.min.js） -->
+<script is:inline src="/js/twikoo.all.min.js"></script>
 <script is:inline>
-  function initTwikoo() {
-    try {
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof twikoo !== 'undefined') {
       twikoo.init({
-        // 👇 替换成你自己的 Twikoo 环境 ID（例如 https://twikoo.yourdomain.com）
         envId: 'http://47.108.235.131:40063/',
         el: '#tcomment',
       });
-    } catch (e) {
-      console.error('Twikoo 初始化失败：', e);
+    } else {
+      console.error('Twikoo 未加载');
     }
-  }
+  });
 </script>
 
-<script
-  is:inline
-  defer
-  src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js"
-  onload="initTwikoo()"
-></script>
+<!-- 全局样式修复：彻底移除评论区内所有可点击控件的下划线和边框 -->
+<style is:global>
+  .twikoo-wrap a,
+  .twikoo-wrap button,
+  .twikoo-wrap .tk-submit,
+  .twikoo-wrap .tk-action,
+  .twikoo-wrap .tk-input,
+  .twikoo-wrap .tk-comment-link,
+  .twikoo-wrap .tk-reply-link {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  /* 保证输入框底部边框为正常颜色，不是黑色 */
+  .twikoo-wrap input,
+  .twikoo-wrap textarea {
+    border: 1px solid #ccc !important;
+    border-bottom: 1px solid #ccc !important;
+  }
+</style>
