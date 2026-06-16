@@ -3,7 +3,35 @@ import Layout from "./Layout.astro";
 import config from "@/config";
 import Twikoo from '@/components/Twikoo.astro';
 
-// ... 前面的 props 和 structuredData 代码保持不变 ...
+type Props = {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+  canonicalURL?: string;
+  pubDatetime?: Date;
+  modDatetime?: Date | null;
+};
+
+const { site } = config;
+
+const { title, description, ogImage, canonicalURL, pubDatetime, modDatetime } =
+  Astro.props;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: title ?? site.title,
+  image: ogImage,
+  ...(pubDatetime && { datePublished: pubDatetime.toISOString() }),
+  ...(modDatetime && { dateModified: modDatetime.toISOString() }),
+  author: [
+    {
+      "@type": "Person",
+      name: site.author,
+      ...(site.profile && { url: site.profile }),
+    },
+  ],
+};
 ---
 
 <Layout {title} {description} {ogImage} {canonicalURL}>
@@ -14,10 +42,8 @@ import Twikoo from '@/components/Twikoo.astro';
     <script type="application/ld+json" is:inline set:html={JSON.stringify(structuredData)} />
   </Fragment>
 
-  <article class="prose w-full max-w-3xl mx-auto">
+  <article>
     <slot />
-    <div class="mt-8 not-prose">
-      <Twikoo />
-    </div>
+    <Twikoo />
   </article>
 </Layout>
