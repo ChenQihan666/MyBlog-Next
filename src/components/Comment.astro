@@ -2,40 +2,53 @@
 // src/components/Comment.astro
 ---
 
-<div id="tcomment" class="twikoo-wrap"></div>
+<div id="Comments"></div>
 
-<!-- 使用本地 JS 文件（放在 public/js/twikoo.all.min.js） -->
+<!-- 使用本地 JS（确保 public/js/twikoo.all.min.js 存在） -->
 <script is:inline src="/js/twikoo.all.min.js"></script>
+
 <script is:inline>
-  document.addEventListener('DOMContentLoaded', function() {
-    if (typeof twikoo !== 'undefined') {
-      twikoo.init({
-        envId: 'http://47.108.235.131:40063/',
-        el: '#tcomment',
-      });
-    } else {
-      console.error('Twikoo 未加载');
+  function initTwikoo() {
+    // 清理旧实例（避免重复挂载）
+    if (window.tw) {
+      const container = document.getElementById('Comments');
+      if (container) container.innerHTML = '';
+      window.tw = null;
     }
-  });
+    const container = document.getElementById('Comments');
+    if (!container) return;
+    try {
+      window.tw = twikoo.init({
+        el: '#Comments',
+        envId: 'http://47.108.235.131:40063/', // 替换为你的环境ID
+        lang: 'zh-CN',
+      });
+    } catch (e) {
+      console.error('Twikoo 初始化失败：', e);
+    }
+  }
+
+  // 首次加载和 Astro 页面切换时均执行
+  window.addEventListener('load', initTwikoo);
+  document.addEventListener('astro:page-load', initTwikoo);
 </script>
 
-<!-- 全局样式修复：彻底移除评论区内所有可点击控件的下划线和边框 -->
+<!-- 样式重置：精准作用于 #Comments 内部，移除所有黑线 -->
 <style is:global>
-  .twikoo-wrap a,
-  .twikoo-wrap button,
-  .twikoo-wrap .tk-submit,
-  .twikoo-wrap .tk-action,
-  .twikoo-wrap .tk-input,
-  .twikoo-wrap .tk-comment-link,
-  .twikoo-wrap .tk-reply-link {
+  #Comments a,
+  #Comments button,
+  #Comments .tk-submit,
+  #Comments .tk-action,
+  #Comments .tk-input,
+  #Comments .tk-comment-link,
+  #Comments .tk-reply-link {
     text-decoration: none !important;
     border-bottom: none !important;
     box-shadow: none !important;
     outline: none !important;
   }
-  /* 保证输入框底部边框为正常颜色，不是黑色 */
-  .twikoo-wrap input,
-  .twikoo-wrap textarea {
+  #Comments input,
+  #Comments textarea {
     border: 1px solid #ccc !important;
     border-bottom: 1px solid #ccc !important;
   }
