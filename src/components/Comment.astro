@@ -4,12 +4,12 @@
 
 <div id="tcomment"></div>
 
-<!-- 定义初始化函数 -->
 <script is:inline>
   function initTwikoo() {
     try {
       twikoo.init({
-        envId: 'http://47.108.235.131:40063/', // 👈 替换成你自己的 Twikoo 环境 ID（如 https://xxx.vercel.app）
+        // 👇 替换成你自己的 Twikoo 环境 ID（例如 https://twikoo.yourdomain.com）
+        envId: 'http://47.108.235.131:40063/',
         el: '#tcomment',
       });
     } catch (e) {
@@ -18,5 +18,9 @@
   }
 </script>
 
-<!-- 延迟加载 twikoo CDN，加载完成后自动初始化 -->
-<script is:inline defer src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js" onload="initTwikoo()"></script>
+<script
+  is:inline
+  defer
+  src="https://cdn.jsdelivr.net/npm/twikoo@1/dist/twikoo.all.min.js"
+  onload="initTwikoo()"
+></script>
