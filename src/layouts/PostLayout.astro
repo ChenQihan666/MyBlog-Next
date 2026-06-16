@@ -39,24 +39,6 @@ const structuredData = {
     <slot />
   </article>
 
-  <!-- 评论区域：宽度对齐、居中，并强制清除浮动和溢出隐藏，确保容器包裹所有内容 -->
-  <div class="comment-wrapper max-w-3xl mx-auto px-4 mt-8 w-full" style="clear: both; overflow: hidden;">
-    <Comment />
-  </div>
+  <!-- 直接放置评论组件，不带额外包裹层，与成功博客一致 -->
+  <Comment />
 </Layout>
-
-<!-- 额外样式备用（若 Comment 中的样式未生效） -->
-<style is:global>
-  .comment-wrapper a,
-  .comment-wrapper button,
-  .comment-wrapper .tk-submit {
-    text-decoration: none !important;
-    border-bottom: none !important;
-    box-shadow: none !important;
-  }
-  .comment-wrapper input,
-  .comment-wrapper textarea {
-    border: 1px solid #ccc;
-    border-bottom: 1px solid #ccc !important;
-  }
-</style>
