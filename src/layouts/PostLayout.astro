@@ -77,9 +77,10 @@ const structuredData = {
     ></script>
   </Fragment>
 
-  <slot />
-
-  <div class="max-w-3xl mx-auto px-4 mt-8 w-full">
-    <Comment />
-  </div>
+  <main>
+    <slot />
+    <div class="max-w-3xl mx-auto px-4 mt-8 w-full">
+      <Comment />
+    </div>
+  </main>
 </Layout>
