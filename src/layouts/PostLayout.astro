@@ -1,7 +1,7 @@
 ---
 import Layout from "./Layout.astro";
 import config from "@/config";
-import Comment from "../components/Comment.astro";   // 新增评论组件
+import Comment from "../components/Comment.astro";
 
 type Props = {
   title?: string;
@@ -36,9 +36,7 @@ const structuredData = {
 
 <Layout {title} {description} {ogImage} {canonicalURL}>
   <Fragment slot="head">
-    <!-- Override og:type for article pages -->
     <meta property="og:type" content="article" />
-
     {
       pubDatetime && (
         <meta
@@ -55,7 +53,6 @@ const structuredData = {
         />
       )
     }
-
     <script
       type="application/ld+json"
       is:inline
@@ -63,6 +60,13 @@ const structuredData = {
     />
   </Fragment>
 
-  <slot />
-  <Comment />   <!-- 文章内容下方直接放置评论 -->
+  <!-- 文章内容（保持原有结构） -->
+  <article class="prose prose-lg max-w-3xl mx-auto px-4">
+    <slot />
+  </article>
+
+  <!-- 👇 评论区域：应用与文章相同的宽度和居中样式 -->
+  <div class="max-w-3xl mx-auto px-4 mt-8 w-full">
+    <Comment />
+  </div>
 </Layout>
