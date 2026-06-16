@@ -2,25 +2,25 @@
 // src/components/Comment.astro
 ---
 
-<div id="Comments"></div>
-
-<!-- 使用本地 JS（确保 public/js/twikoo.all.min.js 存在） -->
-<script is:inline src="/js/twikoo.all.min.js"></script>
+<div id="Comments" data-astro-transition-persist="twikoo-comments">
+  <p style="text-align: center;">加载评论区中...</p>
+</div>
 
 <script is:inline>
   function initTwikoo() {
-    // 清理旧实例（避免重复挂载）
     if (window.tw) {
-      const container = document.getElementById('Comments');
-      if (container) container.innerHTML = '';
+      const el = document.getElementById('Comments');
+      if (el) el.innerHTML = '';
       window.tw = null;
     }
-    const container = document.getElementById('Comments');
-    if (!container) return;
+
+    const el = document.getElementById('Comments');
+    if (!el) return;
+
     try {
       window.tw = twikoo.init({
         el: '#Comments',
-        envId: 'http://47.108.235.131:40063/', // 替换为你的环境ID
+        envId: 'http://47.108.235.131:40063/',
         lang: 'zh-CN',
       });
     } catch (e) {
@@ -28,28 +28,6 @@
     }
   }
 
-  // 首次加载和 Astro 页面切换时均执行
   window.addEventListener('load', initTwikoo);
   document.addEventListener('astro:page-load', initTwikoo);
 </script>
-
-<!-- 样式重置：精准作用于 #Comments 内部，移除所有黑线 -->
-<style is:global>
-  #Comments a,
-  #Comments button,
-  #Comments .tk-submit,
-  #Comments .tk-action,
-  #Comments .tk-input,
-  #Comments .tk-comment-link,
-  #Comments .tk-reply-link {
-    text-decoration: none !important;
-    border-bottom: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-  }
-  #Comments input,
-  #Comments textarea {
-    border: 1px solid #ccc !important;
-    border-bottom: 1px solid #ccc !important;
-  }
-</style>
