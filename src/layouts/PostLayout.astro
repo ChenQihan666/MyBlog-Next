@@ -39,25 +39,24 @@ const structuredData = {
     <slot />
   </article>
 
-  <!-- 评论区域：宽度对齐、居中、清除浮动 -->
-  <div class="comment-wrapper max-w-3xl mx-auto px-4 mt-8 w-full" style="clear: both;">
+  <!-- 评论区域：宽度对齐、居中，并强制清除浮动和溢出隐藏，确保容器包裹所有内容 -->
+  <div class="comment-wrapper max-w-3xl mx-auto px-4 mt-8 w-full" style="clear: both; overflow: hidden;">
     <Comment />
   </div>
 </Layout>
 
-<!-- 全局样式修复黑线问题（仅针对评论区域） -->
+<!-- 额外样式备用（若 Comment 中的样式未生效） -->
 <style is:global>
   .comment-wrapper a,
   .comment-wrapper button,
   .comment-wrapper .tk-submit {
     text-decoration: none !important;
     border-bottom: none !important;
-    box-shadow: none !important; /* 有时黑线是 box-shadow 造成的 */
+    box-shadow: none !important;
   }
-  /* 如果评论框内部输入框出现黑线 */
   .comment-wrapper input,
   .comment-wrapper textarea {
-    border: 1px solid #ccc; /* 保持边框但去掉下划线风格 */
-    border-bottom: 1px solid #ccc !important; /* 保证底部不是黑色 */
+    border: 1px solid #ccc;
+    border-bottom: 1px solid #ccc !important;
   }
 </style>
