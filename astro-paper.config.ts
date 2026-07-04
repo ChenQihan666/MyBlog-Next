@@ -30,6 +30,7 @@ export default defineAstroPaperConfig({
   socials: [
     { name: "github",   url: "https://github.com/ChenQihan666" },
     { name: "x",        url: "https://x.com/QihanNX" },
+    { name: "telegram",        url: "https://t.me/qihannx" },
     { name: "mail",     url: "mailto:im@qihanx.cn" },
   ],
   shareLinks: [
