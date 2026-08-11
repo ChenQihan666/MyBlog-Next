@@ -60,12 +60,12 @@ export default defineConfig({
   },
   fonts: [
     {
-      name: "Nunito",
-      cssVariable: "--font-nunito",
+      name: "Noto Serif SC",
+      cssVariable: "--font-noto-serif-sc",
       provider: fontProviders.google(),
-      fallbacks: ["sans-serif"],
-      weights: [300, 400, 500, 600, 700, 800],
-      styles: ["normal", "italic"],
+      fallbacks: ["serif"],
+      weights: [400, 600, 700, 900],
+      styles: ["normal"],
       formats: ["woff", "ttf"],
     },
   ],
