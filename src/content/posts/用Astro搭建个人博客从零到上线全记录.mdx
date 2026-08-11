@@ -1,0 +1,220 @@
+---
+title: "用Astro搭建个人博客：从零到上线全记录"
+description: "分享我用Astro框架搭建个人博客的全部过程，包括框架选择、项目配置、部署优化和SEO实践。"
+pubDatetime: 2026-08-11
+author: "Qihan"
+tags: ["技术教程"]
+category: "技术教程"
+---
+
+想搭个个人博客，这个念头在心里转了挺久。市面上的方案太多，Hexo、Hugo 这类静态生成器，WordPress 这种动态 CMS，各有各的好。最终选了 Astro，主要就三个原因：快、灵活、写起来舒服。
+
+这篇文章把搭建过程从头到尾记下来，给想自己搭博客的人做个参考。
+
+## 为什么是 Astro
+
+先说说为什么不是别的。
+
+Hexo 和 Hugo 是老牌的静态博客生成器，生态成熟、模板也多，但定制起来挺费劲，想改点东西得先搞懂它的主题系统。WordPress 功能强大但太重，一个小博客配数据库加 PHP，维护成本不低。Next.js 适合做复杂应用，纯博客场景有点杀鸡用牛刀。
+
+Astro 做了几个很对的选择：
+
+**默认输出静态 HTML**。Astro 虽然是前端框架，但默认是静态站点生成器（SSG），构建出来就是一堆 HTML 加 CSS 加 JS，直接往服务器一丢就行，不需要 Node.js 运行时。
+
+**岛屿架构（Islands Architecture）**。页面上大部分静态内容直接用 HTML 渲染，只有需要交互的部分才加载 JavaScript。结果是首屏加载极快，几乎不跑 JS。
+
+**组件生态灵活**。你可以在 Astro 文件里直接写 Vue、React、Svelte 组件，混着用也没问题。不过我的博客全是纯 Astro 组件，没用其他框架。
+
+**Markdown/MDX 一等的支持**。在 `src/content/posts/` 下放 `.md` 或 `.mdx` 文件，Astro 自动收集成文章集合，你只需要写 frontmatter 和内容，不需要手动配置路由。
+
+## 项目初始化
+
+我用的是开源主题 [AstroPaper](https://github.com/satnaing/astro-paper) 作为基础。设计简洁、功能完整，支持明暗切换、标签分类、RSS、搜索。我没有完全照搬，做了一些修改来适配自己的需求。
+
+```bash
+# 我是从已有的模板仓库 fork 下来改的
+# 你也可以直接用 create astro 开始
+npm create astro@latest my-blog -- --template satnaing/astro-paper
+```
+
+## 核心配置
+
+### 内容集合
+
+Astro 的内容集合（Content Collections）是它的杀手锏。在 `src/content.config.ts` 里定义文章 schema：
+
+```typescript
+const posts = defineCollection({
+  loader: glob({ pattern: "**/[^_]*.{md,mdx}", base: "./src/content/posts" }),
+  schema: ({ image }) =>
+    z.object({
+      author: z.string().default(config.site.author),
+      pubDatetime: z.date(),
+      title: z.string(),
+      description: z.string(),
+      tags: z.array(z.string()).default(["others"]),
+      // 其他可选字段
+    }),
+});
+```
+
+每篇文章就是一个 `.mdx` 文件，写好 frontmatter 就行：
+
+```yaml
+---
+title: "文章标题"
+description: "简短描述"
+pubDatetime: 2026-08-11
+tags: ["技术教程"]
+---
+```
+
+### Frontmatter 字段
+
+前端开发者应该很眼熟，就是 YAML 格式的元数据：
+
+- **title**: 文章标题
+- **description**: 文章摘要，会用在 SEO meta 和卡片展示
+- **pubDatetime**: 发布日期，必填
+- **modDatetime**: 修改日期，可选
+- **tags**: 标签数组，默认 `["others"]`
+- **draft**: 草稿标记，设为 `true` 不会构建出来
+- **featured**: 是否置顶
+- **author**: 作者名，默认取 config 中的 site.author
+- **ogImage**: 自定义 OG 图片
+
+### 图片与静态资源
+
+博客图片统一放在 `src/assets/images/` 目录下，Astro 会自动优化图片（压缩、生成多种尺寸），引用方式：
+
+```astro
+---
+import blogImage from "@/assets/images/some-image.png";
+---
+<img src={blogImage} alt="描述" />
+```
+
+路径别名 `@/` 指向 `src/`，在 `tsconfig.json` 里配置。
+
+## 部署
+
+Astro 的部署方式很简单。构建完的产物在 `dist/` 目录，一堆静态文件：
+
+```bash
+npm run build
+```
+
+然后把 `dist/` 里的东西扔到任意 Web 服务器就行。
+
+我的做法是在 Linux 服务器上用 Nginx 托管：
+
+```nginx
+server {
+    listen 80;
+    server_name qihanx.cn;
+    root /var/www/myblog/dist;
+    index index.html;
+    
+    location / {
+        try_files $uri $uri.html $uri/ =404;
+    }
+}
+```
+
+没有数据库、没有后端进程、没有环境变量——就是静态文件，挂了也就挂了（其实不太可能挂）。配置 HTTPS 用 certbot 自动申请 Let's Encrypt 证书，一条命令搞定：
+
+```bash
+certbot --nginx -d qihanx.cn
+```
+
+## 日常写文章
+
+写文章就是本地写 `.mdx` 文件，然后通过 GitHub API 上传到仓库。流程大概是这样：
+
+1. 写 `.mdx` 文章内容
+2. 提交到 GitHub 仓库触发 CI 自动构建
+3. CI 构建完把 `dist/` 部署到服务器
+
+本地网络访问 GitHub 有时候不稳定，所以用 `gh` CLI 走 API 上传文件，最稳。
+
+```bash
+# 查看现有文章
+gh api repos/用户名/仓库名/contents/src/content/posts --jq '.[].name'
+
+# 创建新文章
+CONTENT=$(cat /tmp/article.mdx | base64 -w0)
+gh api repos/用户名/仓库名/contents/src/content/posts/文件名.mdx \
+  -X PUT \
+  -f message="add: 文章标题" \
+  -f content="$CONTENT" \
+  -f branch="main"
+
+# 更新已有文章（需要先获取 SHA）
+SHA=$(gh api repos/... --jq '.sha')
+gh api repos/.../文件名.mdx \
+  -X PUT \
+  -f message="update: xxx" \
+  -f content="$CONTENT" \
+  -f sha="$SHA" \
+  -f branch="main"
+```
+
+## SEO 与搜索引擎收录
+
+静态博客对搜索引擎很友好，页面内容一开始就在 HTML 里，不需要 JS 渲染。但有些东西还是得自己配。
+
+### 自动生成的 SEO 要素
+
+- **RSS Feed**：AstroPaper 自带 `/rss.xml`，搜索引擎和 RSS 阅读器都能自动发现
+- **Sitemap**：Astro 官方 `@astrojs/sitemap` 插件，构建后生成 `sitemap-index.xml`
+- **Meta 标签**：每篇文章的 title 和 description 自动生成 OG 和 Twitter Card
+
+### 提交搜索引擎
+
+文章发布后，要让搜索引擎尽快知道。我用的是 IndexNow 协议：
+
+```bash
+curl -s -X POST "https://api.indexnow.org/IndexNow" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{
+    "host": "你的域名",
+    "key": "你的密钥",
+    "keyLocation": "https://你的域名/密钥.txt",
+    "urlList": ["https://你的域名/posts/文章链接/"]
+  }'
+```
+
+IndexNow 返回 HTTP 202 表示成功。另外也可以通过 Bing Webmaster Tools 的 SubmitUrl API 补充提交。两者配合，新文章基本当天就能被收录。
+
+不用主动提交 sitemap，Bing 会自动爬取的。
+
+## 一些小细节
+
+### 插入追踪统计
+
+我用了 Microsoft Clarity 来看访问情况。在 Astro 里插入脚本需要用 `is:inline` 属性，让 Astro 跳过对脚本的类型推断：
+
+```astro
+<script is:inline>
+  // Clarity 追踪代码
+  (function(c,l,a,r,i,t,y){ ... })();
+</script>
+```
+
+不加 `is:inline` 的话，Astro 会把脚本当成模块处理，TypeScript 类型检查会报 Clarity 变量未定义的错误。
+
+### 域名配置
+
+域名解析用 CNAME 记录指向服务器 IP 或 CDN。免费的 Cloudflare CDN 能提供基本的 DDoS 保护和缓存加速。不想套 CDN 的话，直接 A 记录解析到服务器 IP 也行，速度更快但缺少防护。
+
+## 总结
+
+从搭建到上线，Astro 给我的感觉是，该有的都有，不该有的都没有。
+
+不复杂，不写前端也能配置出好看的博客。不臃肿，生成的就是 HTML，没额外负担。不锁死，哪天想换主题、加功能，Astro 的组件化架构让这些事情都很自然。
+
+想搭博客的话，不妨试试 Astro。不需要会 React、不需要后端经验，MDX 写文章就够了。剩下的交给框架。
+
+---
+
+这篇文章记录了我搭建博客的做法。如果你也在折腾博客或者遇到什么问题，欢迎留言交流。
