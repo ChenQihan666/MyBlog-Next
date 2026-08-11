@@ -6,6 +6,7 @@ export default {
     posts: "文章",
     tags: "标签",
     about: "关于",
+    links: "友链",
     archives: "归档",
     search: "搜索",
   },
@@ -49,6 +50,9 @@ export default {
 
     archivesTitle: "归档",
     archivesDesc: "我归档的所有文章。",
+
+    linksTitle: "友链",
+    linksDesc: "我的朋友们的博客和网站。",
 
     searchTitle: "搜索",
     searchDesc: "搜索任意文章……",
