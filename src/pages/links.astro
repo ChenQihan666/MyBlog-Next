@@ -1,36 +1,136 @@
 ---
-import { getEntry, render } from "astro:content";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Breadcrumb from "@/components/Breadcrumb.astro";
 import Main from "@/components/Main.astro";
 import Footer from "@/components/Footer.astro";
 import config from "@/config";
+import { useTranslations } from "@/i18n";
 
-const links = await getEntry("pages", "links");
+const locale = Astro.currentLocale ?? config.site.lang;
+const t = useTranslations(locale);
 
-if (!links) {
-  throw new Error(
-    "Missing content entry: `links.md` or `links.mdx` in `src/content/pages/`"
-  );
+interface FriendLink {
+  name: string;
+  url: string;
+  avatar: string;
+  desc: string;
 }
 
-const { Content } = await render(links);
+const links: FriendLink[] = [
+  {
+    name: "落雪の自留地",
+    url: "https://www.lxhtt.cn",
+    avatar: "https://www.lxhtt.cn/img/avatar.webp",
+    desc: "活着就是为了改变世界",
+  },
+];
 ---
 
-<Layout
-  title={`${links.data.title} | ${config.site.title}`}
-  description={links.data.description}
-  ogImage={links.data.ogImage}
-  canonicalURL={links.data.canonicalURL}
->
+<Layout title={`友链 | ${config.site.title}`} description="我的朋友们的博客和网站">
   <Header />
 
   <Breadcrumb />
 
-  <Main pageTitle={links.data.title} class="app-prose">
-    <Content />
+  <Main pageTitle="友链" pageDesc="我的朋友们的博客和网站" class="app-prose">
+    <div class="links-grid">
+      {
+        links.map((link) => (
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-card"
+          >
+            <img src={link.avatar} alt={`${link.name} 图标`} class="link-avatar" />
+            <div class="link-info">
+              <span class="link-name">{link.name}</span>
+              <span class="link-desc">{link.desc}</span>
+            </div>
+          </a>
+        ))
+      }
+    </div>
+
+    <h2>友情链接申请</h2>
+
+    <p>如贵站符合以下条件，并希望交换友情链接，可发送邮件到 im@qihanx.cn。</p>
+
+    <ul>
+      <li>✅ 贵站在中国大陆区域能够正常访问；</li>
+      <li>✅ 贵站符合中国大陆法律法规；</li>
+      <li>✅ 贵站已添加本站友情链接。</li>
+    </ul>
+
+    <p>本站友链信息如下：</p>
+
+    <ul>
+      <li><strong>网站名称：</strong> 启涵的小破站</li>
+      <li><strong>网站地址：</strong> https://qihanx.cn</li>
+      <li><strong>网站图标：</strong> https://qihanx.cn/favicon.png</li>
+      <li><strong>网站简介：</strong> 最慢的步伐不是跬步，而是徘徊；最快的脚步不是冲刺，而是坚持。</li>
+    </ul>
   </Main>
 
   <Footer />
 </Layout>
+
+<style is:global>
+  .links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .link-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--muted);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: var(--foreground);
+  }
+
+  .link-card:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--background));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .link-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: var(--background);
+  }
+
+  .link-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .link-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.3;
+  }
+
+  .link-desc {
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
