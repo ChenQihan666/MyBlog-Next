@@ -60,11 +60,11 @@ export default defineConfig({
   },
   fonts: [
     {
-      name: "Google Sans Code",
-      cssVariable: "--font-google-sans-code",
+      name: "Nunito",
+      cssVariable: "--font-nunito",
       provider: fontProviders.google(),
-      fallbacks: ["monospace"],
-      weights: [300, 400, 500, 600, 700],
+      fallbacks: ["sans-serif"],
+      weights: [300, 400, 500, 600, 700, 800],
       styles: ["normal", "italic"],
       formats: ["woff", "ttf"],
     },
