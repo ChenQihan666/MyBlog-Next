@@ -17,8 +17,3 @@ description: "我的朋友们的博客和网站"
 - **网站地址：** https://qihanx.cn
 - **网站图标：** https://qihanx.cn/favicon.png
 - **网站简介：** 最慢的步伐不是跬步，而是徘徊；最快的脚步不是冲刺，而是坚持。
-
-### 朋友们
-
-- [Astro 官网](https://astro.build) — 这个博客就是用它搭建的
-- [GitHub](https://github.com) — 代码托管平台，我所有项目都在这里
