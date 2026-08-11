@@ -10,25 +10,25 @@
   --font-app: var(--font-google-sans-code);
 }
 
-/* Light theme values */
+/* Light theme - fresh green */
 :root,
 [data-theme="light"] {
-  --background: #fdfdfd;
-  --foreground: #282728;
-  --accent: #006cac;
+  --background: #f0f6f0;
+  --foreground: #1b3b2b;
+  --accent: #2d6a4f;
   --accent-foreground: #ffffff;
-  --muted: #e6e6e6;
-  --muted-foreground: #6b7280;
-  --border: #ece9e9;
+  --muted: #d8e2dc;
+  --muted-foreground: #52796f;
+  --border: #c5d5cb;
 }
 
-/* Dark theme values */
+/* Dark theme - deep forest green */
 [data-theme="dark"] {
-  --background: #212737;
-  --foreground: #eaedf3;
-  --accent: #ff6b01;
-  --accent-foreground: #ffffff;
-  --muted: #343f60;
-  --muted-foreground: #afb9ca;
-  --border: #ab4b08;
+  --background: #14261c;
+  --foreground: #d8f3dc;
+  --accent: #52b788;
+  --accent-foreground: #14261c;
+  --muted: #2d4a3e;
+  --muted-foreground: #95d5b2;
+  --border: #40916c;
 }
