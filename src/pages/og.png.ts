@@ -6,7 +6,7 @@ import { getFontPathByWeight } from "@/utils/getFontPathByWeight";
 import config from "@/config";
 
 export const GET: APIRoute = async context => {
-  const fonts = fontData["--font-nunito"];
+  const fonts = fontData["--font-noto-serif-sc"];
   const regularFontPath = getFontPathByWeight(fonts, 400);
   const boldFontPath = getFontPathByWeight(fonts, 700);
 
@@ -34,7 +34,7 @@ export const GET: APIRoute = async context => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "Nunito",
+          fontFamily: "Noto Serif SC",
         },
         children: [
           {
@@ -145,13 +145,13 @@ export const GET: APIRoute = async context => {
       embedFont: true,
       fonts: [
         {
-          name: "Nunito",
+          name: "Noto Serif SC",
           data: regularData,
           weight: 400,
           style: "normal",
         },
         {
-          name: "Nunito",
+          name: "Noto Serif SC",
           data: boldData,
           weight: 700,
           style: "normal",
