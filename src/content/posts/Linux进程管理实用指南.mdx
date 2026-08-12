@@ -1,0 +1,222 @@
+---
+title: "Linux 进程管理实用指南"
+description: "从 ps 到 strace，聊点真正能解决线上问题的进程管理命令。"
+pubDatetime: 2026-08-12
+author: "Qihan"
+tags: ["Linux", "系统运维"]
+---
+
+进程管理这事儿，刚接触 Linux 的时候觉得无非就是 `ps aux` 看一眼、`kill -9` 干掉完事。干得久了才发现，真正线上出问题的时候，靠那几个基础命令根本不够用。
+
+这篇不打算从头教你怎么用 Linux，而是把日常排查中**真正管用**的进程管理命令和技巧串一遍——有些你可能知道但没深挖，有些可能是实战里踩坑换来的经验。
+
+---
+
+## ps：不止是 aux
+
+`ps aux` 是大部分人最熟悉的，但工作中最常用的是这个组合：
+
+```bash
+ps auxf
+```
+
+加个 `f` 参数，输出变成树状结构——你能一眼看出哪个进程是哪个 fork 出来的。排查僵尸进程或者找父进程归属时特别好用。
+
+另一个实用的：
+
+```bash
+ps -eo pid,ppid,%cpu,%mem,rss,vsz,comm,user,start,time --sort=-%cpu | head -20
+```
+
+自定义输出字段，按 CPU 倒序。可以做成 alias：
+
+```bash
+alias pstop='ps -eo pid,ppid,%cpu,%mem,rss,vsz,comm,user,start,time --sort=-%cpu | head -20'
+```
+
+线上查哪个进程在吃资源时，比 `top` 快，输出也更干净。
+
+## top/htop
+
+`top` 默认按 CPU 排序，输入 `M` 按内存排序，输入 `k` 可以直接杀进程。
+
+环境允许的话装个 `htop` 也不亏：
+
+```bash
+apt install htop
+```
+
+htop 的优势：鼠标可操作、彩色显示、可以选中多个进程同时操作、F5 切换树形视图。适合在开发机和测试机上用。
+
+不过生产环境不一定有 htop，`top` 还是得会。
+
+## pgrep/pkill：按名字找进程
+
+大部分人杀进程还是 `ps aux | grep xxx` 拿到 PID 再 `kill`。其实一行搞定：
+
+```bash
+pgrep -f "nginx"
+pkill -f "nginx"
+```
+
+`-f` 表示匹配完整命令行。不加 `-f` 只匹配进程名。
+
+更狠一点的用法：
+
+```bash
+pkill -9 -f "java -jar myapp.jar"
+```
+
+匹配到就杀，不需要手动记 PID。写脚本的时候非常干净。
+
+## kill 的信号表，不要只认识 9
+
+| 信号 | 数字 | 用途 |
+|------|------|------|
+| SIGTERM | 15 | 优雅终止，进程可以清理资源后退出 |
+| SIGKILL | 9 | 强制杀死，进程无法捕获 |
+| SIGINT | 2 | 中断，等价于 Ctrl+C |
+| SIGQUIT | 3 | 退出并生成 core dump |
+| SIGHUP | 1 | 挂起，常用于让 daemon 重载配置 |
+| SIGSTOP | 19 | 暂停进程（无法捕获） |
+| SIGCONT | 18 | 恢复暂停的进程 |
+
+实战中最常见的情景：
+
+- `kill -15 PID` — 先发 SIGTERM，等几秒看进程有没有正常退出
+- `kill -9 PID` — SIGTERM 没反应，再上 SIGKILL
+- 不要上来就 `-9`，除非你确定进程已经卡死
+
+写服务管理脚本的话，优雅停机可以这样来：
+
+```bash
+kill -15 $PID
+sleep 5
+if kill -0 $PID 2>/dev/null; then
+    kill -9 $PID
+fi
+```
+
+先给进程 5 秒做清理，没退出再强制杀。
+
+## nohup 和 disown
+
+```bash
+nohup long-running-command &
+```
+
+nohup 让进程忽略 SIGHUP，关掉终端后继续跑。输出重定向到 `nohup.out`。
+
+更好的做法是显式指定输出文件：
+
+```bash
+nohup ./script.sh > output.log 2>&1 &
+```
+
+如果已经跑了某个进程，忘了加 nohup，可以用 disown：
+
+```bash
+# Ctrl+Z 暂停进程
+bg            # 放到后台继续跑
+disown        # 从当前 shell 的任务表中移除
+```
+
+之后关终端也没事了。
+
+## /proc：活着的进程信息宝藏
+
+每个进程在 `/proc` 下都有一个目录。实战中这些文件很常用：
+
+```bash
+cat /proc/$PID/cmdline       # 完整启动命令
+cat /proc/$PID/environ       # 环境变量
+cat /proc/$PID/status        # 进程状态、内存、线程数
+cat /proc/$PID/limits        # 资源限制
+ls /proc/$PID/fd/            # 打开的文件描述符
+ls /proc/$PID/cwd/           # 进程当前工作目录
+```
+
+查端口占用时，`ss` 或 `lsof` 不够直观，可以直接读：
+
+```bash
+ls -l /proc/$PID/fd/ | grep socket
+```
+
+## lsof：谁在用这个文件/端口
+
+```bash
+lsof -i :80               # 谁在监听 80 端口
+lsof -p $PID              # 某个进程打开了哪些文件
+lsof +D /var/log          # 某个目录下哪些文件被打开了
+```
+
+查端口占用最常用：
+
+```bash
+lsof -i :8080
+```
+
+或者用 `ss` 替代（更快）：
+
+```bash
+ss -tlnp | grep :8080
+```
+
+## strace：看不到的细节都在这里
+
+进程没报错但就是不对，或者你想知道它在等什么——`strace` 是你的最后手段。
+
+```bash
+strace -p $PID                    # 追踪正在运行的进程
+strace -p $PID -e trace=network   # 只看网络相关的系统调用
+strace -p $PID -e trace=file      # 只看文件操作
+strace -p $PID -T -c              # 统计各系统调用的耗时
+```
+
+实战一：查进程为什么卡住
+
+```bash
+strace -p $(pgrep -f "myapp")
+```
+
+如果输出一直停在 `read(` 或 `connect(` 之类的调用上，说明进程在等 I/O 或网络——不是死锁，就是外部依赖慢了。
+
+实战二：查 config 文件读哪去了
+
+```bash
+strace -e trace=open,openat,stat -f ./your-program 2>&1 | grep config
+```
+
+看程序启动时打开的是哪个路径的配置文件——经常能发现读错了路径这种低级但隐蔽的 bug。
+
+## 僵尸进程处理
+
+僵尸进程（Z）是子进程已死但父进程没调用 `wait()` 回收。表现为 `ps aux` 里状态是 `Z`，而且杀不掉。
+
+排查：
+
+```bash
+ps -eo pid,ppid,stat,comm | grep Z
+```
+
+找到僵尸进程的 PID 和 PPID（父进程），然后：
+
+1. 尝试给父进程发 SIGCHLD：`kill -17 $PPID`
+2. 不行就直接杀父进程：`kill -9 $PPID`
+3. 如果父进程是 init（PID=1），只能重启
+
+预防：写程序时记得处理 SIGCHLD，或者在子进程结束后调用 `waitpid()`。
+
+## 总结
+
+进程管理说穿了就这些东西，不比别的命令更高深。线上出问题的时候知道看什么、用什么工具，比临时搜命令靠谱得多。
+
+我自己最常用的排查路子：
+
+1. `ps auxf` 或 `pstop` 看一眼整体情况
+2. CPU/内存异常 → `top` 或 `htop` 定位
+3. 进程卡住 → `strace -p` 看系统调用
+4. 端口问题 → `lsof -i :port` 或 `ss -tlnp`
+5. 杀掉异常进程 → 先 SIGTERM，不行再 SIGKILL
+
+上面提到的命令和技巧，平时可以自己在测试环境多试试。用熟了，排查问题的时候就是本能反应了。
