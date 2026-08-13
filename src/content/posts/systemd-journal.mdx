@@ -1,0 +1,238 @@
+---
+title: "systemd journal 使用指北"
+description: "别只盯着 /var/log 了，journalctl 能干的事比你想象的多。"
+pubDatetime: 2026-08-13
+author: "Qihan"
+tags: ["Linux", "系统运维"]
+---
+
+服务器出问题了，很多人第一反应还是去翻 /var/log。传统日志文件当然要看，但 systemd 时代大部分服务已经把日志交给 journald 了。`journalctl` 用得怎么样，很多时候决定了排查有多快。
+
+这篇聊聊 journal 的几个实用场景，大部分是我自己排查时常用的路子。
+
+---
+
+## 基础
+
+先跑一下看看有什么：
+
+```bash
+journalctl
+```
+
+默认调 less 翻页，按时间倒序，最新的在最下面。想看最新的日志可以直接看尾部：
+
+```bash
+journalctl -n 50
+```
+
+跟 `tail -n` 差不多。
+
+想实时跟踪新日志就加 `-f`：
+
+```bash
+journalctl -f
+```
+
+跟 `tail -f` 一样，停在原地等新日志出现。调试服务时可以开着它。
+
+## 按时间查日志
+
+journal 的一大好处：时间筛选比翻文件精准得多。
+
+```bash
+# 查今天的
+journalctl --since today
+
+# 查某个时间段
+journalctl --since "2026-08-10 14:00" --until "2026-08-10 16:00"
+
+# 查最近 30 分钟
+journalctl --since "30 min ago"
+```
+
+格式很灵活，"yesterday""-1h""2026-08-10" 都能识别。比去 /var/log 里翻 messages 文件方便太多了。
+
+## 按服务/单元查
+
+这是我最常用的场景。某个服务挂了，直接看它的日志：
+
+```bash
+journalctl -u nginx.service
+journalctl -u ssh.service --since today
+journalctl -u docker.service -n 50 -f
+```
+
+多个单元也能一起查：
+
+```bash
+journalctl -u nginx.service -u php-fpm.service
+```
+
+看两个服务的日志交错输出，排查联动问题的时候很方便。
+
+## 按优先级过滤
+
+日志有级别，从 0（emerg）到 7（debug）。只查错误以上的：
+
+```bash
+journalctl -p err -b
+```
+
+查警告和错误：
+
+```bash
+journalctl -p warning
+```
+
+数字也行，`-p 3` 等价于 `-p err`。
+
+一般线上排查从 `-p err` 开始，过滤掉 info 级别的噪声，直接看异常。
+
+## 按本次启动查
+
+每次系统启动的日志是分开存放的。查当前启动的：
+
+```bash
+journalctl -b
+```
+
+查上一次启动的：
+
+```bash
+journalctl -b -1
+```
+
+依次类推，`-b -2` 是上上次。服务器重启后想对比之前的状态，用这个最快。没有 journal 的话你得去 /var/log 里翻轮转后的文件，远不如一个 `-b -1` 来得直接。
+
+---
+
+## 实战一：查某个 PID 的日志
+
+知道某个进程的 PID，直接看它写了什么日志：
+
+```bash
+journalctl _PID=12345
+```
+
+也可以跟时间筛选结合：
+
+```bash
+journalctl _PID=12345 --since "5 min ago"
+```
+
+有些进程名也会记录，不过 `_PID` 是最确定的。
+
+## 实战二：查内核日志
+
+内核日志用 `dmesg` 当然可以，但 journal 也收了一份：
+
+```bash
+journalctl -k
+journalctl -k -p err
+journalctl -k -b -1
+```
+
+硬盘报错、驱动崩了、OOM killer 下手了，这些都能在 `-k` 里看到。以前得 `dmesg | grep error`，现在 `journalctl -k -p err` 一条搞定。
+
+## 实战三：关联日志（按消息关联）
+
+很多服务挂了不是单一原因，journal 有个挺好用的字段 `_COMM`，表示命令名：
+
+```bash
+journalctl _COMM=sshd
+journalctl _COMM=nginx
+```
+
+更细的还可以查 `_SYSTEMD_UNIT` 之类的字段。用 `-o verbose` 可以看到每个日志条目携带的所有字段：
+
+```bash
+journalctl -u nginx.service -o verbose | head -50
+```
+
+输出里能看到 `_PID` `_UID` `_GID` `_COMM` `_EXE` 等各种元数据，这些都可以直接当过滤条件用。
+
+---
+
+## 日志持久化
+
+默认 journald 日志存在内存里，重启后就没了。想持久化很简单：
+
+```bash
+mkdir -p /var/log/journal
+```
+
+或者直接编辑 `/etc/systemd/journald.conf`，把 `Storage` 设为 `persistent`：
+
+```
+[Journal]
+Storage=persistent
+```
+
+之后重启 journald：
+
+```bash
+systemctl restart systemd-journald
+```
+
+持久化后日志会保留在 `/var/log/journal/` 下，按机器 ID 分目录存放。好处是真出问题的时候重启了也能查上次的日志。
+
+## 日志大小控制
+
+journal 日志如果不控制会一直涨。默认是限制在文件系统的 10% 容量，但也可以自己设：
+
+```bash
+# 查看当前限制
+journalctl --disk-usage
+
+# 限制最大 500M
+journalctl --vacuum-size=500M
+
+# 保留最近 7 天
+journalctl --vacuum-time=7d
+
+# 保留最近 1000 条
+journalctl --vacuum-files=1000
+```
+
+也可以在 `journald.conf` 里做永久配置：
+
+```
+SystemMaxUse=500M
+MaxFileSec=7day
+```
+
+新机器最好都配上这个，省得哪天硬盘被日志撑爆了才想起来。
+
+## 日志导出
+
+想把日志拷到别的机器上分析，journal 支持好几种导出格式：
+
+```bash
+# 导出为普通文本
+journalctl -u nginx.service > nginx.log
+
+# 导出为 JSON
+journalctl -u nginx.service -o json > nginx.json
+
+# 导出为可移植的 journal 文件
+journalctl -u nginx.service -o export > nginx.journal
+```
+
+导出格式里 JSON 最好用，每行一条，字段清晰，写脚本处理很方便。
+
+## 性能提示
+
+journal 的数据库文件在 `/var/log/journal/` 下，查日志时其实是在查一个二进制数据库。日志量大的时候，加上时间筛选可以让查询快很多——不带 `--since` 的话可能要从第一条日志开始扫，几十 GB 的日志量够你等一会儿。
+
+另外，`-o cat` 只输出消息内容本身，不带时间戳和主机名这些元数据，想批量处理文本日志时提速明显：
+
+```bash
+journalctl -u nginx.service -o cat --since today
+```
+
+---
+
+上面这些用法不用全记住。先记住几个最常用的就好：`-u` 查服务、`-n` 看尾部、`-f` 跟踪、`-p err` 过滤错误、`--since` 筛时间。这几个组合能覆盖绝大部分排查场景。
+
+剩下的遇到具体问题再查 manual 就行，journalctl(1) 的文档写得不错，比很多项目文档清楚。
