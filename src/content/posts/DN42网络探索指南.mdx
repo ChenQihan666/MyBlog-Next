@@ -48,11 +48,23 @@ DN42 有一个自动分配脚本（`contrib/assign.py`），能帮你找到一�
 
 ## 创建对象文件
 
-Registry 由四种核心对象组成，需要按顺序来：
+Registry 由四种核心对象组成，需要按顺序来。每个对象建好文件后，用 `git add` 加上提交就行，不用急着 push。
 
 ### 1. MNTNER（维护者对象）
 
-这是你的身份标识，所有其他对象都通过 MNTNER 来关联。文件放在 `data/mntner/` 目录。
+这是你的身份标识，所有其他对象都通过 MNTNER 来关联。文件放在 `data/mntner/` 目录，文件名跟对象名一致。
+
+参考模板：
+
+```
+mntner:            你的-MNT        # 维护者名称，全大写
+admin-c:           你的-nic-hdl    # 管理联系人
+ tech-c:           你的-nic-hdl    # 技术联系人
+mnt-by:            你的-MNT        # 由谁维护，指向自身
+source:            DN42            # 固定值
+```
+
+我的实际配置（仅供参考）：
 
 ```
 mntner:            QIHAN-MNT
@@ -64,7 +76,19 @@ source:            DN42
 
 ### 2. PERSON（联系人对象）
 
-需要填写你的联系邮箱和 SSH 公钥。文件放在 `data/person/`。
+需填写你的真实姓名、联系邮箱和 SSH 公钥。文件放在 `data/person/`。
+
+参考模板：
+
+```
+person:            你的姓名
+nic-hdl:           你的-nic-hdl    # 这个值会在其他对象中引用
+e-mail:            你的邮箱
+mnt-by:            你的-MNT
+source:            DN42
+```
+
+我的实际配置（仅供参考）：
 
 ```
 person:            Qihan Chen
@@ -76,7 +100,20 @@ source:            DN42
 
 ### 3. ASN（自治系统号）
 
-声明你拥有的 ASN，文件放在 `data/aut-num/`。
+声明你拿到的 ASN。文件放在 `data/aut-num/`。
+
+参考模板：
+
+```
+aut-num:           AS424242XXXX      # 你的 ASN 号
+as-name:           你的-AS-NAME      # AS 名称，通常简写
+admin-c:           你的-nic-hdl
+tech-c:            你的-nic-hdl
+mnt-by:            你的-MNT
+source:            DN42
+```
+
+我的实际配置（仅供参考）：
 
 ```
 aut-num:           AS4242420665
@@ -89,7 +126,20 @@ source:            DN42
 
 ### 4. inetnum / inet6num（IP 地址段）
 
-IPv4 段放在 `data/inetnum/`，IPv6 段放在 `data/inet6num/`。
+IPv4 段放在 `data/inetnum/`，IPv6 段放在 `data/inet6num/`。注意范围要和 CIDR 对齐。
+
+参考模板：
+
+```
+inetnum:           起始IP - 结束IP    # 例如 172.20.x.x - 172.20.x.x
+netname:           你的名字-NET
+admin-c:           你的-nic-hdl
+tech-c:            你的-nic-hdl
+mnt-by:            你的-MNT
+source:            DN42
+```
+
+我的实际配置（仅供参考）：
 
 ```
 inetnum:           172.20.13.128 - 172.20.13.159
@@ -100,7 +150,16 @@ mnt-by:            QIHAN-MNT
 source:            DN42
 ```
 
-IPv6 格式略有不同，思路完全一样。还需要创建一个 ROUTE / ROUTE6 对象来宣告路由。
+IPv6 用 `inet6num:` 开头，格式差不多，只是起始和结束地址换成 IPv6 地址。另外还需要在 `data/route/` 和 `data/route6/` 下创建 ROUTE / ROUTE6 对象来宣告路由：
+
+```
+route:             172.20.13.128/27
+origin:            AS4242420665
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
+
+ROUTE6 格式类似，地址换成 IPv6 段就行。
 
 ## Commit 签名
 
