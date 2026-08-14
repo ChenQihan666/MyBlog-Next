@@ -150,7 +150,22 @@ mnt-by:            QIHAN-MNT
 source:            DN42
 ```
 
-IPv6 用 `inet6num:` 开头，格式差不多，只是起始和结束地址换成 IPv6 地址。另外还需要在 `data/route/` 和 `data/route6/` 下创建 ROUTE / ROUTE6 对象来宣告路由：
+IPv6 用 `inet6num:` 开头，格式差不多，只是起始和结束地址换成 IPv6 地址。
+
+### 5. ROUTE / ROUTE6（路由宣告）
+
+宣告你的 IP 段路由，IPv4 放在 `data/route/`，IPv6 放在 `data/route6/`。
+
+参考模板（ROUTE）：
+
+```
+route:             你的IPv4段/CIDR    # 跟你 inetnum 定义的完全一致
+origin:            AS424242XXXX        # 你的 ASN
+mnt-by:            你的-MNT
+source:            DN42
+```
+
+我的实际配置（仅供参考）：
 
 ```
 route:             172.20.13.128/27
@@ -159,7 +174,23 @@ mnt-by:            QIHAN-MNT
 source:            DN42
 ```
 
-ROUTE6 格式类似，地址换成 IPv6 段就行。
+ROUTE6 参考模板：
+
+```
+route6:            你的IPv6段/CIDR
+origin:            AS424242XXXX
+mnt-by:            你的-MNT
+source:            DN42
+```
+
+我的实际配置（仅供参考）：
+
+```
+route6:            fd42:e9:f0::/48
+origin:            AS4242420665
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
 
 ## Commit 签名
 
@@ -174,7 +205,19 @@ git config user.signingkey ~/.ssh/id_ed25519.pub
 
 ## 提交 PR
 
-Push 到自己的 fork 之后，通过 API 提 PR：
+Push 到自己的 fork 之后，就可以提 PR 了。可以用 Gitea 网页界面操作，也可以用 API。
+
+参考命令（记得替换为你自己的信息）：
+
+```bash
+gh api repos/dn42/registry/pulls \
+  -X POST \
+  -f title="你的-MNT registration" \
+  -f head="你的Gitea用户名:你的分支名" \
+  -f base="master"
+```
+
+我的实际命令（仅供参考）：
 
 ```bash
 gh api repos/dn42/registry/pulls \
@@ -184,7 +227,7 @@ gh api repos/dn42/registry/pulls \
   -f base="master"
 ```
 
-注意 head 和 base 的分支名可能不同——官方主仓库用的是 `master` 分支而不是 `main`。提交成功后，等着审批通过就行。
+注意 `head` 和 `base` 的分支名——官方主仓库用的是 `master` 分支而不是 `main`，而你的 fork 默认可能是 `main`。提交成功后，等着审批通过就行。
 
 ## 踩坑记录
 
