@@ -1,0 +1,155 @@
+---
+title: DN42 网络探索指南
+description: 从零加入 DN42 自治网络的全记录，包括注册流程、对象创建、SSH 签名提交，以及路由配置的踩坑分享
+pubDatetime: 2026-08-14
+modDatetime: 2026-08-14
+featured: false
+draft: false
+tags:
+  - 网络
+  - DN42
+  - BGP
+---
+
+DN42 是一个主要由爱好者运营的去中心化自治网络，你可以把它理解成一个大型的实验性互联网。它用和公网一样的 IP 分配机制和 BGP 路由协议，区别在于这些地址不会出现在真正的互联网上——它们是私有地址，只在 DN42 内部路由。
+
+这篇记录了我从注册到完成 ASN 申请的全过程，踩了些坑，也学到不少东西。
+
+## DN42 是什么，为什么要玩
+
+DN42（Decentralized Network 42）是一个由社区成员维护的 VPN 网络，2011 年左右创建的。它模拟了一个真实互联网的样子：
+
+- 有自己的 IP 地址空间（IPv4 172.20.0.0/14 和 IPv6 ULA 地址）
+- 跑 BGP 协议做路由交换
+- 用 Registry 系统管理资源（类似 RIR，只不过全球只有一个）
+- 有 DNS 服务，有自己的 whois 数据库
+
+你可以在上面练习 BGP 路由策略配置，测试各种隧道协议（WireGuard、OpenVPN、GRE），搭建你自己的 DNS 服务，运行自己的网站和内部服务。
+
+而且因为 DN42 的定位本来就是实验性网络，你在上面搞坏了什么也不会影响真正的互联网。这种随便折腾的性质，是生产环境给不了的。
+
+## 注册和 Fork Registry
+
+第一步是在 [git.dn42.dev](https://git.dn42.dev) 注册一个账号。这个 Git 服务是整个 DN42 的 Registry 管理平台——所有 IP 地址段、ASN 号、联系人信息都以文件形式存放在一个 Git 仓库里。跟 IANA/RIR 用数据库或 API 管理资源不同，DN42 用的是 Pull Request 机制。
+
+注册完账号后，需要 fork [dn42/registry](https://git.dn42.dev/dn42/registry) 仓库。后续我们在自己的 fork 里创建对象文件，提交后提 PR 到主仓库，审批通过就生效了。
+
+这个流程跟 GitHub 的开源贡献一模一样，只不过这里用的是 Gitea，Git 操作稍微有点不一样。
+
+## 规划地址和 ASN
+
+在创建对象之前，要先搞清楚你需要什么资源：
+
+- ASN：DN42 分配的是私有 ASN，范围是 4242420000 到 4242429999。我自己选了 4242420665。
+- IPv4 地址段：172.20.0.0/14 内，一般新用户能拿到 /27 或 /28 的段。我拿的是 172.20.13.128/27。
+- IPv6 地址段：使用 ULA，我拿了 fd42:e9:f0::/48。
+
+DN42 有一个自动分配脚本（`contrib/assign.py`），能帮你找到一个未被占用的地址段。不过我习惯手动去 registry 里搜一下——看看别人都用了什么地址范围，心里有个数。
+
+## 创建对象文件
+
+Registry 由四种核心对象组成，需要按顺序来：
+
+### 1. MNTNER（维护者对象）
+
+这是你的身份标识，所有其他对象都通过 MNTNER 来关联。文件放在 `data/mntner/` 目录。
+
+```
+mntner:            QIHAN-MNT
+admin-c:           QIHAN-DN42
+tech-c:            QIHAN-DN42
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
+
+### 2. PERSON（联系人对象）
+
+需要填写你的联系邮箱和 SSH 公钥。文件放在 `data/person/`。
+
+```
+person:            Qihan Chen
+nic-hdl:           QIHAN-DN42
+e-mail:            nuo66688@163.com
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
+
+### 3. ASN（自治系统号）
+
+声明你拥有的 ASN，文件放在 `data/aut-num/`。
+
+```
+aut-num:           AS4242420665
+as-name:           QIHAN-AS
+admin-c:           QIHAN-DN42
+tech-c:            QIHAN-DN42
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
+
+### 4. inetnum / inet6num（IP 地址段）
+
+IPv4 段放在 `data/inetnum/`，IPv6 段放在 `data/inet6num/`。
+
+```
+inetnum:           172.20.13.128 - 172.20.13.159
+netname:           QIHAN-NET
+admin-c:           QIHAN-DN42
+tech-c:            QIHAN-DN42
+mnt-by:            QIHAN-MNT
+source:            DN42
+```
+
+IPv6 格式略有不同，思路完全一样。还需要创建一个 ROUTE / ROUTE6 对象来宣告路由。
+
+## Commit 签名
+
+DN42 Registry 要求 commit 必须签名。PGP 和 SSH 签名都支持。我用的是 SSH 签名，因为它不需要额外配置密钥服务器：
+
+```bash
+git config gpg.format ssh
+git config user.signingkey ~/.ssh/id_ed25519.pub
+```
+
+之后用 `git commit -S` 就能签名提交了。注意这里的 `-S` 是大写，不是小写——小写的 `-s` 是 sign-off，不是 GPG 签名，我一开始就搞混了。
+
+## 提交 PR
+
+Push 到自己的 fork 之后，通过 API 提 PR：
+
+```bash
+gh api repos/dn42/registry/pulls \
+  -X POST \
+  -f title="QIHAN-MNT registration" \
+  -f head="Qihan:main" \
+  -f base="master"
+```
+
+注意 head 和 base 的分支名可能不同——官方主仓库用的是 `master` 分支而不是 `main`。提交成功后，等着审批通过就行。
+
+## 踩坑记录
+
+几个容易翻车的地方：
+
+**1. 对象文件名不区分大小写，但习惯上大写**
+比如 `QIHAN-MNT` 和 `qihan-mnt` 会被当成同一个文件，但社区习惯用全大写。MNTNER 文件要跟对象名完全一致。
+
+**2. SSH 签名第一次用需要注册公钥**
+在 Gitea 设置里上传你的公钥，并记下它的 ID。确认上传的 key 指纹是对的——我就因为传错了公钥导致签名验证失败，浪费了不少时间。
+
+**3. ROUTE 对象的 CIDR 要算准**
+IPv4 段是 `172.20.13.128/27`，范围是 `172.20.13.128 - 172.20.13.159`，这两个必须匹配。写错一个就通不过验证脚本。
+
+**4. PR 只接受一个 commit**
+Registry 维护者希望每个 PR 是干净的、只有一个 commit。如果 push 了多个 commit，得用 `git rebase -i` 合并成一个再提交。
+
+**5. 邮箱要注意**
+DN42 的 whois 数据是公开的，有人可能会顺着 whois 里的邮箱联系你。最好用一个专门用于 DN42 的邮箱，别用私人邮箱。
+
+## 下一步
+
+PR 合并之后，就可以开始配置路由了。大致流程是：找几个愿意跟你建立对等连接的 DN42 用户，通过 WireGuard 创建隧道，在 Bird 或 FRR 里配置 BGP 会话，然后宣告你的路由段。
+
+先连上两三个 Peer，跑通 BGP 之后就能跟整个 DN42 网络通信了。
+
+如果你也在折腾 DN42，或者有什么问题，欢迎来聊聊。
