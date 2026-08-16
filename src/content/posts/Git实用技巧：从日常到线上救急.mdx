@@ -1,0 +1,255 @@
+---
+title: "Git 实用技巧：从日常到线上救急"
+description: "不聊 hello world，聊点能帮你省时间、救场子的 Git 操作。"
+pubDatetime: 2026-08-16
+author: "Qihan"
+tags: ["Git", "版本控制", "效率工具"]
+---
+
+Git 这东西，大部分人用着用着就形成了肌肉记忆，`add`、`commit`、`push`、`pull`，四板斧走天下。真要遇到 merge 冲突、不小心 commit 了不该 commit 的东西、或者线上 bug 要紧急回滚，肌肉记忆就不够用了。
+
+这篇不是 Git 入门教程，就是把日常和线上排查里**真用得上**的操作串一遍，有些你可能知道但没细想过，有些是踩坑换来的。
+
+---
+
+## 后悔药：改掉最近一次 commit
+
+最常见的情况，commit 完发现少了个文件，或者 message 写错了。
+
+```bash
+# 改 message
+git commit --amend -m "新的提交信息"
+
+# 加文件进上一个 commit
+git add forgot-file.txt
+git commit --amend --no-edit
+```
+
+`--amend` 会把当前暂存区的内容合并到上一个 commit 里，生成一个新的替换掉旧的。所以**已经 push 的 commit 改完再 push 要用 `--force-with-lease`**，别用裸的 `--force`。
+
+```bash
+git push --force-with-lease
+```
+
+`--force-with-lease` 会检查远程分支有没有你未知的更新，避免覆盖别人的提交。
+
+---
+
+## 后悔药大一号：rebase -i 修改历史
+
+如果后悔的不是上一次 commit，而是更早的，就得用交互式 rebase。
+
+```bash
+git rebase -i HEAD~3
+```
+
+会打开一个编辑器，列出最近 3 个 commit，你可以对每个 commit 指定操作：
+
+- `pick` 保留
+- `reword` 只改 message
+- `edit` 改内容
+- `squash` 合并到上一个 commit
+- `drop` 删除
+
+我常用的是 `squash`，开发时习惯 commit 得勤，但推到远端前 `squash` 成几个逻辑清晰的 commit，历史看着清爽。
+
+注意：已经 push 到公共分支的 commit，别用 rebase 改。除非你确定这条分支只有你一个人在用。
+
+---
+
+## 手滑了：把 commit 恢复到某个历史版本
+
+线上出 bug 要紧急回滚，`git revert` 比 `git reset` 靠谱。
+
+```bash
+# 回滚到某个 commit，生成一个新的 revert commit
+git revert HEAD --no-edit
+
+# 回滚多个 commit
+git revert HEAD~3..HEAD --no-edit
+```
+
+`git revert` 不会删除历史，而是生成一个"反做"的 commit，团队其他人 pull 的时候不会出问题。`git reset` 是直接删历史，只要已经 push 了，就别用。
+
+---
+
+## 一不小心 commit 到 master 了
+
+场景：在 master 上改了点东西，commit 完了才发现。分支也没建。
+
+```bash
+# 从当前 commit 创建一个新分支
+git branch feature/my-new-feature
+
+# 把 master 回到上一个 commit
+git reset HEAD~1 --hard
+
+# 切到新分支继续
+git checkout feature/my-new-feature
+```
+
+这套操作的前提是**还没 push**。如果已经 push 了，用 `git revert`：
+
+```bash
+git revert HEAD
+git checkout -b feature/my-new-feature
+```
+
+---
+
+## 救急：stash 临时保存现场
+
+正在改东西，突然有人喊你修个紧急 bug，改了一半的代码不想 commit 又不想丢。
+
+```bash
+# 保存当前工作区
+git stash push -m "WIP: 重构中"
+
+# 切到别的分支干活
+git checkout master
+
+# 修完回来
+git checkout my-feature
+git stash pop
+```
+
+`stash list` 可以看所有 stash 记录，`git stash pop` 恢复最近的，`git stash apply stash@{2}` 恢复指定的。
+
+还有个注意点：`git stash` 默认只保存 tracked 文件，新文件不会被保存。想连新文件一起存：
+
+```bash
+git stash push -u  # 包含 untracked 文件
+```
+
+---
+
+## bisect：二分法找 bug
+
+有时候 bug 不是最近引入的，可能是两三周前的一个 commit 导致的。这时候靠 `git bisect` 快速定位。
+
+```bash
+# 开始二分查找
+git bisect start
+
+# 标记当前版本是坏的
+git bisect bad
+
+# 标记一个好版本
+git bisect good v1.0
+
+# Git 会 checkout 一个中间版本，你测试一下
+# 如果没问题，标记 good
+git bisect good
+
+# 如果有问题，标记 bad
+git bisect bad
+
+# 重复几次，直到找到第一个引入问题的 commit
+```
+
+原理就是二分查找，100 个 commit 里最多 7 步就能找到。配合自动测试脚本更好：
+
+```bash
+git bisect run npm test
+```
+
+---
+
+## 整理 commit 历史：rebase 合并
+
+觉得自己的 commit 历史太碎，想整理一下再 push。
+
+```bash
+git rebase -i HEAD~5
+```
+
+把前面几个 `pick` 改成 `squash` 或 `fixup`，`fixup` 和 `squash` 的区别是 `fixup` 会丢掉被合并的 commit message。
+
+举个例子：五个 commit 分别是"改了个 typo"、"改样式"、"改样式回退"、"加功能"、"改了个 typo"。用 `fixup` 合并成一个干净的 commit，看着舒服。
+
+---
+
+## 不小心 git add 了大文件
+
+场景：不小心把 `node_modules` 或者一个几百 MB 的日志文件 `git add` 了，还没 commit。
+
+```bash
+# 从暂存区移除，但保留文件
+git reset -- file/to/remove
+
+# 或者全局清理
+git reset
+```
+
+如果已经 commit 了，用 `git rm --cached` 从追踪中移除：
+
+```bash
+git rm --cached giant-file.log
+git commit -m "remove giant file"
+```
+
+---
+
+## 少打几个字：实用配置
+
+几个能提升日常效率的配置：
+
+```bash
+# 简化 git log
+git config --global alias.lg "log --oneline --graph --all --decorate"
+
+# 自动补全分支名
+git config --global --type=bool user.autoCommitDisable false
+
+# pull 时用 rebase 而不是 merge，避免产生多余的 merge commit
+git config --global pull.rebase true
+
+# push 时只推送当前分支
+git config --global push.default current
+```
+
+`git lg` 之后看到的分支图清晰很多，一眼能看到各个分支的上下游关系。
+
+---
+
+## 小技巧合集
+
+一些零散但用得上的：
+
+**只看某人的提交**
+```bash
+git log --author="Qihan"
+```
+
+**搜索某个字符串是什么时候引入的**
+```bash
+git log -p -S "someFunction" --since="2024-01-01"
+```
+
+**显示某个文件每一行的最后修改**
+```bash
+git blame src/main.js
+```
+
+**从另一个分支挑一个 commit 过来**
+```bash
+git cherry-pick abc123
+```
+
+**看当前分支和 master 的差异**
+```bash
+git log master..HEAD --oneline
+```
+
+**找回被 delete 的分支（只要还有 reflog）**
+```bash
+git reflog
+# 在输出里找到被删分支的最后一个 commit hash
+git checkout -b recovered-branch abc123
+```
+
+`reflog` 是 Git 的救命稻草，只要你在本地操作过，`reflog` 里都有记录，哪怕 `rebase` 完发现不对，也能找回原来的状态。
+
+---
+
+Git 学到这份上，大部分日常场景都能应付了。遇到问题先想想是要改历史还是恢复历史，再挑对应的工具下手。`reflog` 是最后的兜底，实在不行还有它。
