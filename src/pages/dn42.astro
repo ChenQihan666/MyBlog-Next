@@ -1,0 +1,36 @@
+---
+import { getEntry, render } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import Footer from "@/components/Footer.astro";
+import config from "@/config";
+
+const dn42 = await getEntry("pages", "dn42");
+
+if (!dn42) {
+  throw new Error(
+    "Missing content entry: `dn42.md` or `dn42.mdx` in `src/content/pages/`"
+  );
+}
+
+const { Content } = await render(dn42);
+---
+
+<Layout
+  title={`${dn42.data.title} | ${config.site.title}`}
+  description={dn42.data.description}
+  ogImage={dn42.data.ogImage}
+  canonicalURL={dn42.data.canonicalURL}
+>
+  <Header />
+
+  <Breadcrumb />
+
+  <Main pageTitle={dn42.data.title} class="app-prose">
+    <Content />
+  </Main>
+
+  <Footer />
+</Layout>
