@@ -4,7 +4,7 @@ export default {
   nav: {
     home: "首页",
     posts: "文章",
-    tags: "标签",
+    tags: "网络",
     about: "关于",
     links: "友链",
     archives: "归档",
@@ -42,8 +42,8 @@ export default {
     tagTitle: "标签",
     tagDesc: "带有此标签的所有文章",
 
-    tagsTitle: "所有标签",
-    tagsDesc: "文章中使用的所有标签。",
+    tagsTitle: "网络",
+    tagsDesc: "网络相关页面。",
 
     postsTitle: "文章",
     postsDesc: "我发布的所有文章。",
