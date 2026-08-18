@@ -1,0 +1,298 @@
+---
+title: "nftables 实战：从规则编写到踩坑复盘"
+description: "用真实场景聊聊 nftables 替代 iptables 后的规则写法、调试方法和几个踩过的坑。"
+pubDatetime: 2026-08-18
+author: "Qihan"
+tags: ["网络", "Linux", "防火墙"]
+---
+
+nftables 出来好几年了，RHEL 8 以后已经是默认防火墙后端，Debian 10+ 也全面转向了它。但实际用的人还是不算多——大部分要么继续抱着 iptables，要么干脆用 ufw/firewalld 这种前端工具。
+
+我倒不是主动去学的。纯粹是有台机器跑 BGP 路由，iptables 和 nftables 混用导致规则冲突，排查了一下午才搞清楚怎么回事。后来索性把规则全迁移到 nftables，顺手踩了些坑。
+
+这篇记录一些实际的规则写法、调试思路和踩过的坑，不讲基础概念，默认你知道 table/chain/rule 是什么。
+
+---
+
+## 从 iptables 迁移：先搞清楚架构差异
+
+iptables 的架构是每个 table 各自维护一套 chain：
+
+```
+iptables:
+├── filter (INPUT / FORWARD / OUTPUT)
+├── nat (PREROUTING / INPUT / OUTPUT / POSTROUTING)
+└── mangle (...)
+```
+
+nftables 把这个层级关系扁平化了。你自己建 table，在 table 里建 chain，chain 可以绑定到不同的 hook：
+
+```
+nftables:
+├── table inet filter
+│   ├── chain input { type filter hook input priority 0; }
+│   ├── chain forward { type filter hook forward priority 0; }
+│   └── chain output { type filter hook output priority 0; }
+└── table inet nat
+    └── chain postrouting { type nat hook postrouting priority srcnat; }
+```
+
+所以你完全可以在一个 table 里放所有 chain，不过为了可读性，一般还是按功能拆。
+
+迁移的第一件事不是写规则，是把现有的 iptables 规则导出看一眼：
+
+```bash
+iptables-save > /tmp/iptables-backup.txt
+ip6tables-save > /tmp/ip6tables-backup.txt
+```
+
+有些发行版自带翻译工具：
+
+```bash
+iptables-translate -A INPUT -p tcp --dport 22 -j ACCEPT
+# nft add rule ip filter INPUT tcp dport 22 counter accept
+```
+
+但 `iptables-translate` 只能翻单条，复杂规则集还是得自己重写。其实这也是个梳理规则的好机会，你大概率会发现一些陈年旧规早该清理了。
+
+---
+
+## 基础规则：快速上手
+
+nftables 默认不带任何规则，装完是空的。先建一个最基本的防护：
+
+```bash
+nft add table inet filter
+nft add chain inet filter input { type filter hook input priority 0\; policy drop\; }
+nft add chain inet filter forward { type filter hook forward priority 0\; policy drop\; }
+nft add chain inet filter output { type filter hook output priority 0\; policy accept\; }
+```
+
+`inet` 地址族同时覆盖 IPv4 和 IPv6，不用像 iptables 那样写两套规则。
+
+然后放行必要的流量：
+
+```bash
+# loopback
+nft add rule inet filter input iif lo accept
+
+# 已建立的连接
+nft add rule inet filter input ct state established,related accept
+
+# SSH
+nft add rule inet filter input tcp dport 22 accept
+
+# ICMP
+nft add rule inet filter input icmp type { echo-request, echo-reply } accept
+nft add rule inet filter input icmpv6 type { echo-request, echo-reply, nd-neighbor-solicit, nd-router-advert } accept
+```
+
+注意 IPv6 必须放行 NDP（邻居发现协议），否则 IPv6 直接挂。新手最容易在这栽跟头。
+
+---
+
+## 用文件管理规则
+
+命令行 ad-hoc 加规则适合测试，正式环境建议用配置文件。Debian 系的入口是 `/etc/nftables.conf`：
+
+```bash
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        iif lo accept
+        ct state established,related accept
+        ct state invalid drop
+
+        tcp dport 22 accept
+        icmp type { echo-request } accept
+        icmpv6 type { echo-request, nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert } accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        ct state established,related accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+```
+
+加载：
+
+```bash
+nft -f /etc/nftables.conf
+```
+
+`flush ruleset` 会清空所有规则再重新加载，原子操作，不会出现半加载的状态。比 `iptables-restore` 舒服得多。
+
+确认规则生效：
+
+```bash
+nft list ruleset
+```
+
+---
+
+## 集合（set）：比 iptables 的 ipset 好用太多
+
+需要针对一组 IP 做规则时，iptables 得靠 ipset 配合，nftables 原生支持 set：
+
+```bash
+table inet filter {
+    set allowed-ssh {
+        type ipv4_addr
+        elements = { 10.0.0.1, 10.0.0.2 }
+    }
+
+    chain input {
+        ip saddr @allowed-ssh tcp dport 22 accept
+    }
+}
+```
+
+动态更新：
+
+```bash
+nft add element inet filter allowed-ssh { 10.0.0.3 }
+nft delete element inet filter allowed-ssh { 10.0.0.1 }
+```
+
+set 支持的类型很丰富，`ipv4_addr`、`ipv6_addr`、`inet_service`（端口）、`ifname`（网卡名）都行。做访问控制时比 iptables 一条条写清晰多了。
+
+---
+
+## NAT：注意 hook 优先级
+
+nftables 的 NAT 要单独建 chain，hook 优先级有讲究：
+
+```bash
+table inet nat {
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "eth0" masquerade
+    }
+}
+```
+
+`priority srcnat` 等于数字 100，比 filter 的 0 低，确保路由决策完成后再做 NAT。
+
+SNAT 的例子（给特定来源做源地址转换）：
+
+```bash
+chain postrouting {
+    ip saddr 10.0.0.0/8 ip daddr 172.20.0.0/14 snat to 192.168.1.100
+    oifname "eth0" masquerade
+}
+```
+
+这里有个容易犯的错，**规则顺序**。nftables 在同一 chain 里从上到下匹配，第一条命中了就不会继续。比如上面这条，内网到 DN42 的流量会先被 SNAT 匹配，不会走到后面的 masquerade。逻辑上没问题，但顺序反过来就废了。
+
+---
+
+## 实战踩坑记录
+
+### 坑一：FORWARD 规则和 WireGuard 接口
+
+机器做网关，跑着 WireGuard 隧道。FORWARD chain 里只放了 `ct state established,related accept`，结果 WG 对端来的新连接全被 drop。
+
+原因是 FORWARD 的 `established,related` 只放行已有连接的回包，新连接需要显式放行。
+
+```bash
+chain forward {
+    ct state established,related accept
+    iifname "wg0" accept
+    iifname "wg1" accept
+}
+```
+
+加新 WG peer 时记得同步更新这里的规则。
+
+### 坑二：inet table 和 IP 版本混用
+
+inet table 同时作用于 IPv4 和 IPv6，但有些 match 是版本相关的。
+
+```bash
+# 这行在 inet table 里会报错
+tcp dport 22 accept  # 实际上这行 OK
+
+# 但这行不行——icmp 和 icmpv6 是不同的协议
+icmp type echo-request accept  # 只匹配 IPv4 的 ICMP
+```
+
+需要同时写两条：
+
+```bash
+icmp type { echo-request } accept
+icmpv6 type { echo-request, nd-neighbor-solicit, nd-neighbor-advert } accept
+```
+
+### 坑三：POSTROUTING 的 MASQUERADE 没想象中那么智能
+
+MASQUERADE 规则通常写成：
+
+```bash
+oifname "eth0" masquerade
+```
+
+它会匹配所有从 eth0 出去的流量。但 WireGuard 的 BGP 流量走的是 wg 接口，根本不会命中 `oifname "eth0"`，所以不需要额外写 return 规则去排除它。
+
+反过来，如果你在 NAT chain 里先写了 SNAT，再写 MASQUERADE，确保 SNAT 在前面。nftables 首次匹配即停止，MASQUERADE 放前面会把所有流量都 MASQUERADE 掉。
+
+### 坑四：规则改了没生效
+
+nftables 有个常见的坑，`nft add rule` 直接加了规则，但没写进配置文件。重启后规则全丢。
+
+临时测试用命令行，确认没问题后写到 `/etc/nftables.conf`，然后 `nft -f /etc/nftables.conf` 全量加载。别只改文件不加载，也别只加命令不写文件。
+
+---
+
+## 调试技巧
+
+**看规则匹配计数：**
+
+```bash
+nft list ruleset -a
+```
+
+每条规则后面的 `counter packets X bytes Y` 能看到命中了多少次。比 iptables 的 `-vL` 直观不少。
+
+**加 log 规则排查：**
+
+```bash
+nft add rule inet filter input tcp dport 8080 log prefix "NFT-DEBUG: " accept
+```
+
+日志会进 kernel log，`dmesg -w` 或者 `journalctl -k -f` 看。
+
+**追踪特定包：**
+
+```bash
+nft add rule inet filter input meta nftrace set 1
+nft monitor trace
+```
+
+这个功能 iptables 要做很麻烦，nftables 原生支持，排查路由和 NAT 问题时尤其好用。
+
+**测试规则不真正加载：**
+
+```bash
+nft --check -f /etc/nftables.conf
+```
+
+改完配置文件先 dry-run，确认语法没问题再正式加载。远程操作的时候这个习惯能救命。
+
+---
+
+## 结尾
+
+nftables 不是什么银弹，但 iptables 之后确实该是它这样了。规则文件可读、set 原生支持、trace 开箱即用、原子加载不丢包。机器还在用 iptables 的话，下次重装系统或者重构网络配置的时候，顺手切过去也不亏。
+
+不用一次性全迁完，iptables 和 nftables 可以共存（虽然不推荐），慢慢来就行。
