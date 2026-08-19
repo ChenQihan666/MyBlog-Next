@@ -1,0 +1,301 @@
+---
+title: "Docker Compose 生产环境部署指北"
+description: "不止是 docker-compose.yml，聊聊部署中真正会遇到的问题：权限、网络、日志、重启策略和一次踩坑复盘。"
+pubDatetime: 2026-08-19
+author: "Qihan"
+tags: ["容器", "Docker", "部署"]
+---
+
+Docker Compose 这东西，入门门槛低得离谱——一个 `docker-compose.yml`、一个 `docker compose up -d` 就能跑起来。但真放到生产环境里，问题比想象中多。
+
+这篇不是入门教程，不教你写 Compose 文件。聊的是实际部署中会碰到的几个问题，以及怎么让服务跑得稳。
+
+---
+
+## 先搞清楚版本：docker-compose vs docker compose
+
+Docker 的 Compose 工具现在有两个形态：
+
+- **docker-compose**（v1）：独立的 Python 二进制，命令格式 `docker-compose up`
+- **docker compose**（v2）：Docker CLI 插件，命令格式 `docker compose up`
+
+v1 已经停止维护，官方推荐用 v2。安装 Docker Engine 时带上 `docker compose plugin` 就行，不需要额外装 `docker-compose`。
+
+检查当前用的是哪个：
+
+```bash
+docker compose version
+```
+
+输出带 `Docker Compose version v2` 就是对的。如果输出 `docker-compose version 1.x`，说明你还在用老的独立二进制，该换了。
+
+v2 一个实用的改进是 `docker compose ps` 输出直接显示服务名，不像 v1 带一长串项目前缀。排查时少敲几个字。
+
+---
+
+## 权限问题：不要用 root 跑容器
+
+一个非常常见的坑：容器里跑 root 用户，挂载的 volume 写出来的文件在宿主机上是 root 权限，其他用户动不了。
+
+解决方案是容器里用非 root 用户。
+
+```yaml
+services:
+  app:
+    image: myapp:latest
+    user: "1000:1000"
+    volumes:
+      - ./data:/app/data
+```
+
+用 `user` 指定 UID:GID，宿主机上的文件和容器内用户保持一致。不确定当前用户的 UID 和 GID 可以先跑：
+
+```bash
+id
+```
+
+如果镜像支持通过环境变量传用户（比如 Linuxserver.io 的镜像），优先用环境变量：
+
+```yaml
+services:
+  app:
+    image: lscr.io/linuxserver/radarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+```
+
+有些镜像没有内置用户切换机制，那就得自己写 Dockerfile 处理。
+
+---
+
+## 网络：容器名就是 DNS
+
+Docker Compose 会自动给每个 Compose 文件创建一个 bridge 网络，容器之间默认用**服务名**互相访问。
+
+```yaml
+services:
+  web:
+    image: nginx:latest
+    ports:
+      - "80:80"
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: secret
+```
+
+web 容器内部可以直接用 `db:5432` 连 postgres，不需要拼 IP。
+
+但如果你把不同 Compose 项目的容器放到同一个网络，需要显式声明：
+
+```yaml
+networks:
+  shared:
+    external: true
+```
+
+然后在 `docker network create shared` 之后，其他 Compose 文件引用这个网络。容器之间直接用服务名互相访问就能通。
+
+---
+
+## 重启策略：别让服务挂了就挂
+
+默认情况下容器不会自动重启。生产环境必须配 `restart`：
+
+```yaml
+services:
+  app:
+    image: myapp:latest
+    restart: unless-stopped
+```
+
+几种策略的区别：
+
+| 策略 | 行为 |
+|------|------|
+| `no` | 默认，不重启 |
+| `always` | 无论什么原因退出都重启 |
+| `on-failure` | 仅非零退出码时重启 |
+| `unless-stopped` | 除非手动停止，否则重启（推荐） |
+
+`always` 和 `unless-stopped` 的区别很小，但很重要：`unless-stopped` 会记住你是否手动停止了容器，重启 Docker daemon 后不会复活。`always` 会，有时候你故意停掉的东西重启后又冒出来了，很烦。
+
+---
+
+## 健康检查：别让 Nginx 把挂了
+
+Nginx 或 Traefik 做反向代理时，如果后端容器挂了但 nginx 不知道，请求会打到一个死掉的容器上。
+
+Compose 支持 `healthcheck`：
+
+```yaml
+services:
+  web:
+    image: nginx:latest
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+```
+
+参数说明：
+- `interval`：多久检查一次
+- `timeout`：单次检查超时时间
+- `retries`：连续失败多少次后标记为 unhealthy
+- `start_period`：启动后等多久才开始检查
+
+对于依赖关系，用 `depends_on` 加 `condition`：
+
+```yaml
+services:
+  web:
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+```
+
+这样 web 服务会等到 db 的健康检查通过后再启动。比 sleep 等几秒可靠得多。
+
+---
+
+## 日志：别让 journald 和容器日志打架
+
+Docker 默认用 `json-file` 驱动写日志，路径在 `/var/lib/docker/containers/<id>/<id>-json.log`。如果不配日志轮转，时间长了能把磁盘撑满。
+
+生产环境建议配置日志驱动：
+
+```yaml
+# /etc/docker/daemon.json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+
+改完重启 Docker：
+
+```bash
+systemctl restart docker
+```
+
+如果宿主机在用 journald，也可以改用 `journald` 驱动，统一管理：
+
+```yaml
+services:
+  app:
+    logging:
+      driver: journald
+      options:
+        tag: "{{.Name}}"
+```
+
+用 `journald` 的好处是所有日志走一个地方，`journalctl -u docker` 或者 `journalctl CONTAINER_NAME=myapp` 就能捞，不用在 `/var/lib/docker` 下面翻。
+
+---
+
+## volumes：理解 bind mount 和 named volume
+
+```yaml
+services:
+  app:
+    volumes:
+      - ./data:/app/data          # bind mount
+      - db_data:/var/lib/mysql    # named volume
+
+volumes:
+  db_data:
+```
+
+bind mount 直接挂载宿主机目录，路径透明，备份方便。缺点是如果目录不存在，Compose 不会自动创建，容器启动会报错。
+
+named volume 由 Docker 管理，路径在 `/var/lib/docker/volumes/`，权限和隔离性好。但备份需要额外操作：
+
+```bash
+docker run --rm -v db_data:/data -v $(pwd):/backup alpine tar czf /backup/db_data.tar.gz -C /data .
+```
+
+选哪个？配置文件、静态资源用 bind mount，数据库、中间件的数据用 named volume。
+
+---
+
+## 环境变量：`.env` 文件比写在 yml 里干净
+
+密码、API key 这类敏感信息，不要直接写在 `docker-compose.yml` 里。
+
+Compose 默认会读取同目录的 `.env` 文件：
+
+```bash
+# .env
+DB_PASSWORD=supersecret
+API_KEY=sk-1234567890
+```
+
+```yaml
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+```
+
+如果有多套环境（开发、生产），可以用不同的 env 文件：
+
+```bash
+docker compose --env-file .env.prod up -d
+```
+
+注意 `.env` 文件要加进 `.gitignore`，别把密码提交到仓库里。
+
+---
+
+## 一次踩坑：dnsmasq 和 Docker 的内置 DNS 冲突
+
+有台机器上跑了 dnsmasq（监听 53 端口做本地 DNS），后来又装了 Docker。Docker 的内置 DNS resolver 默认用 `/etc/resolv.conf` 里的 127.0.0.1，结果容器里的 DNS 请求打到了宿主机的 dnsmasq，而 dnsmasq 没配上游转发，容器内部域名解析全挂。
+
+表现是容器能 ping 通 IP 但 ping 不通域名。
+
+排查思路：
+
+```bash
+docker exec -it myapp cat /etc/resolv.conf
+# nameserver 127.0.0.11  （Docker 内置 DNS）
+# 但这台机器上被改成了 127.0.0.1
+
+docker exec -it myapp nslookup google.com
+# ;; connection timed out; no servers could be reached
+```
+
+解决方案：在 `/etc/docker/daemon.json` 里显式指定 DNS：
+
+```json
+{
+  "dns": ["114.114.114.114", "8.8.8.8"]
+}
+```
+
+然后重启 Docker。容器内部 DNS 请求会先走 Docker 内置 resolver（127.0.0.11），这个 resolver 会转发到 `daemon.json` 里配的上游 DNS，不再依赖宿主机的 `/etc/resolv.conf`。
+
+---
+
+## 小结
+
+Compose 用起来不难，但把服务跑稳需要关注几个点：
+
+1. 权限对齐——容器内 UID 和宿主机一致
+2. 重启策略配好——`unless-stopped` 是生产默认
+3. 健康检查——别让反向代理把流量打到挂掉的容器
+4. 日志轮转——磁盘满了再排查比配个 `max-size` 麻烦得多
+5. 环境变量分离——密码别写 yml 里
+
+出问题的时候也别慌，`docker compose logs`、`docker inspect`、`docker exec` 三板斧甩出来，大部分问题都能定位。
