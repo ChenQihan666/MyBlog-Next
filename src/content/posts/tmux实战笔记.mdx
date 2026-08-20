@@ -1,0 +1,247 @@
+---
+title: tmux 实战笔记
+description: 多窗口工作流与会话管理
+pubDatetime: 2026-08-20
+tags: ["终端", "效率工具"]
+---
+
+## 为什么用 tmux
+
+SSH 断了，进程还在跑。开十几个标签页切来切去眼花，tmux 一个窗口搞定。省事。
+
+## 基本操作
+
+默认前缀键 `Ctrl+b`，后面简写成 `Prefix`。
+
+### 会话管理
+
+```bash
+# 新建会话
+tmux new -s work
+
+# 离开会话（进程继续跑）
+Prefix + d
+
+# 列出所有会话
+tmux ls
+
+# 重新连接
+tmux attach -t work
+
+# 删除会话
+tmux kill-session -t work
+```
+
+SSH 断了直接 `tmux attach` 回来，编译、下载、跑脚本都不会中断。
+
+### 窗口分割
+
+```bash
+# 上下分割
+Prefix + "
+
+# 左右分割
+Prefix + %
+
+# 切换面板
+Prefix + 方向键
+
+# 调整大小
+Prefix + Ctrl + 方向键
+
+# 关闭当前面板
+Prefix + x
+```
+
+一个窗口里同时看日志、改代码、跑命令，不用切标签页。
+
+### 窗口管理
+
+```bash
+# 新建窗口
+Prefix + c
+
+# 切换窗口
+Prefix + 数字
+
+# 重命名窗口
+Prefix + ,
+
+# 关闭窗口
+Prefix + &
+```
+
+把不同项目放在不同窗口，work、test、deploy 分开管，清楚。
+
+## 实际场景
+
+### 服务器维护
+
+```bash
+# 第一个面板：监控日志
+tail -f /var/log/nginx/access.log
+
+# 第二个面板：htop 看资源
+htop
+
+# 第三个面板：改配置
+vim /etc/nginx/nginx.conf
+```
+
+一屏看完，不用开三个 SSH 连接。
+
+### 开发调试
+
+```bash
+# 上面编辑器
+vim main.py
+
+# 下面跑程序
+python main.py
+
+# 右边看日志
+tail -f app.log
+```
+
+改完代码，切到下面窗口直接跑，不用退出编辑器。
+
+### 长时间任务
+
+```bash
+# 启动编译
+make build
+
+# 离开会话
+Prefix + d
+
+# 关掉电脑，回家
+# 第二天回来
+tmux attach
+
+# 编译还在跑，或者已经结束了
+```
+
+编译、备份、数据迁移这种耗时操作，扔在 tmux 里不用守着。
+
+## 配置优化
+
+创建 `~/.tmux.conf`：
+
+```bash
+# 改前缀键为 Ctrl+a（更顺手）
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+
+# 从 1 开始编号（0 太远）
+set -g base-index 1
+setw -g pane-base-index 1
+
+# 鼠标支持
+set -g mouse on
+
+# 状态栏
+set -g status-style bg=black,fg=white
+set -g status-left '[#S] '
+set -g status-right '%H:%M %d-%b-%y'
+
+# 分割线颜色
+set -g pane-border-style fg=colour238
+set -g pane-active-border-style fg=colour39
+
+# 快速重载配置
+bind r source-file ~/.tmux.conf \; display "配置已重载"
+```
+
+改完运行：
+
+```bash
+tmux source ~/.tmux.conf
+```
+
+或者在 tmux 里按 `Prefix + r`。
+
+## 快捷键速查
+
+| 操作 | 快捷键 |
+|------|--------|
+| 上下分割 | `Prefix + "` |
+| 左右分割 | `Prefix + %` |
+| 切换面板 | `Prefix + 方向键` |
+| 新建窗口 | `Prefix + c` |
+| 切换窗口 | `Prefix + 0-9` |
+| 离开会话 | `Prefix + d` |
+| 滚动查看历史 | `Prefix + [` 然后用方向键 |
+| 退出滚动模式 | `q` |
+
+## 常见问题
+
+### 颜色显示不对
+
+编辑 `~/.bashrc` 或 `~/.zshrc`：
+
+```bash
+export TERM=screen-256color
+```
+
+重新登录或 `source ~/.bashrc`。
+
+### 复制粘贴不方便
+
+进入复制模式：
+
+```bash
+Prefix + [
+# 移动到起始位置
+空格开始选择
+# 移动到结束位置
+Enter 复制
+# 粘贴
+Prefix + ]
+```
+
+或者直接开鼠标模式，选中自动复制。
+
+### 会话太多管不过来
+
+```bash
+# 批量删除
+tmux kill-session -a  # 删除除当前会话外的所有会话
+
+# 或者写个脚本清理旧会话
+tmux ls | grep -v attached | cut -d: -f1 | xargs -I {} tmux kill-session -t {}
+```
+
+## 配合其他工具
+
+### vim
+
+在 tmux 里用 vim，`Esc` 延迟问题：
+
+```bash
+# ~/.tmux.conf
+set -sg escape-time 0
+```
+
+### SSH 跳板机
+
+```bash
+# 本地先启动 tmux
+tmux
+
+# 在 tmux 里 SSH
+ssh user@server
+
+# 服务器上再启动 tmux
+tmux
+```
+
+本地断了服务器会话还在，服务器 SSH 断了任务还在跑。
+
+## 什么时候不用 tmux
+
+- 只是临时登录看一眼，开 tmux 多此一举
+- 任务很快就结束，几秒钟的命令没必要
+- 已经有 systemd service 或者后台进程管理工具，tmux 不是守护进程的正确方式
+
+SSH 断线保活、多窗口协作、长时间任务，这些场景 tmux 好用。其他时候直接 SSH 就够了。
