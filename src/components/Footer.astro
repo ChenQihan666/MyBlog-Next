@@ -1,11 +1,28 @@
 ---
+import { getCommitSha } from "@/utils/getCommitSha";
+
 const currentYear = new Date().getFullYear();
+const repoUrl = "https://github.com/ChenQihan666/MyBlog-Next";
+const commitSha = await getCommitSha();
 ---
 
 <footer class="app-layout mt-auto">
   <div class="border-border flex flex-col items-center justify-between border-t py-6 sm:flex-row sm:py-4">
     <div class="my-2">
       <span>&copy; {currentYear} 启涵的小破站</span>
+      {
+        commitSha && (
+          <a
+            href={`${repoUrl}/commit/${commitSha}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ml-1.5 text-sm opacity-70 hover:underline"
+            title={`当前部署的提交：${commitSha}`}
+          >
+            ({commitSha})
+          </a>
+        )
+      }
     </div>
     <div class="my-2">
       <a
